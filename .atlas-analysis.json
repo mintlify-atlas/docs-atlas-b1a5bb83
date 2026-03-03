@@ -1,0 +1,110 @@
+{
+  "projectType": "saas",
+  "projectName": "Goalst",
+  "projectDescription": "A personal and collaborative goal-tracking platform with nested goals, progress tracking, and team collaboration.",
+  "theme": "mint",
+  "primaryColor": "#10b981",
+  "lightColor": "#6ee7b7",
+  "darkColor": "#047857",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/goals",
+              "features/nested-goals",
+              "features/collaboration",
+              "features/sharing",
+              "features/templates",
+              "features/progress-tracking",
+              "features/gamification"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/setting-up-supabase",
+              "guides/authentication",
+              "guides/deployment"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/introduction",
+              "api/authentication"
+            ]
+          },
+          {
+            "group": "Data Models",
+            "pages": [
+              "api/models/goal",
+              "api/models/collaborator",
+              "api/models/share-link",
+              "api/models/comment",
+              "api/models/template"
+            ]
+          },
+          {
+            "group": "Hooks",
+            "pages": [
+              "api/hooks/goals",
+              "api/hooks/collaborators",
+              "api/hooks/share-links",
+              "api/hooks/comments",
+              "api/hooks/templates",
+              "api/hooks/scoring"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Nested goal hierarchies with unlimited depth",
+    "Real-time collaboration with role-based permissions",
+    "Shareable goal links for external viewing",
+    "Goal templates for quick setup",
+    "Progress tracking with manual and computed metrics",
+    "Gamification with scoring and achievement ranks",
+    "Recurring goals with daily/weekly cadence",
+    "Comments and discussions on goals"
+  ],
+  "publicApiSurface": [
+    "useGoals() - Fetch all top-level goals",
+    "useGoal(id) - Fetch a single goal",
+    "useSubGoals(parentId) - Fetch child goals",
+    "useCreateGoal() - Create a new goal",
+    "useUpdateGoal() - Update goal properties",
+    "useDeleteGoal() - Delete a goal",
+    "useCollaborators(goalId) - Fetch collaborators",
+    "useAddCollaborator() - Add collaborator by email",
+    "useUpdateCollaboratorRole() - Change collaborator role",
+    "useRemoveCollaborator() - Remove a collaborator",
+    "useShareLinks(goalId) - Fetch share links",
+    "useCreateShareLink() - Create shareable link",
+    "useRevokeShareLink() - Revoke a share link",
+    "useGoalByToken(token) - Fetch goal via share token",
+    "useComments(goalId) - Fetch goal comments",
+    "useAddComment() - Add a comment",
+    "useTemplates() - Fetch user templates",
+    "useSaveTemplate() - Save goal as template",
+    "useDeleteTemplate() - Delete a template",
+    "useUserScore() - Fetch user score and rank"
+  ]
+}

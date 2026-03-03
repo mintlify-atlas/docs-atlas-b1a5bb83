@@ -1,0 +1,387 @@
+---
+title: Authentication
+description: Understand how authentication works in Goalst
+---
+
+Goalst uses Supabase Auth to handle user authentication. This guide explains the authentication flow, how to use the auth context, and how routes are protected.
+
+## Authentication architecture
+
+The authentication system consists of three main parts:
+
+1. **Supabase client** - Handles communication with Supabase Auth
+2. **Auth provider** - Manages auth state and exposes it via React context
+3. **Auth guards** - Protect routes based on authentication status
+
+## Auth provider
+
+The `AuthProvider` wraps your application and provides authentication state to all components.
+
+### How it works
+
+```typescript src/features/auth/providers/auth-provider.tsx
+import { createContext, useContext, useEffect, useState } from 'react'
+import { supabase } from '@shared/services/supabase-client'
+import type { User } from '@shared/types'
+
+interface AuthContextValue {
+  user: User | null
+  loading: boolean
+  signOut: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) {
+        setUser({
+          id: data.session.user.id,
+          email: data.session.user.email!,
+          created_at: data.session.user.created_at,
+        })
+      }
+      setLoading(false)
+    })
+
+    // Listen for auth changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email!,
+          created_at: session.user.created_at,
+        })
+      } else {
+        setUser(null)
+      }
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  async function signOut() {
+    await supabase.auth.signOut()
+    setUser(null)
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+```
+
+### Key features
+
+<AccordionGroup>
+  <Accordion title="Session restoration">
+    On mount, the provider checks for an existing session using `supabase.auth.getSession()`. If a valid session exists (from localStorage), the user is automatically logged in.
+  </Accordion>
+
+  <Accordion title="Real-time auth state">
+    The provider subscribes to auth state changes using `onAuthStateChange()`. This ensures the UI updates immediately when:
+    
+    - User signs in
+    - User signs out
+    - Session expires
+    - User signs in on another tab
+  </Accordion>
+
+  <Accordion title="User object mapping">
+    Supabase returns a full auth user object, but Goalst extracts only the necessary fields:
+    
+    ```typescript
+    interface User {
+      id: string
+      email: string
+      created_at: string
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Using the auth context
+
+Access authentication state in any component using the `useAuth` hook:
+
+```typescript
+import { useAuth } from '@features/auth/providers/auth-provider'
+
+function MyComponent() {
+  const { user, loading, signOut } = useAuth()
+
+  if (loading) {
+    return <div>Loading...</div>
+  }
+
+  if (!user) {
+    return <div>Please sign in</div>
+  }
+
+  return (
+    <div>
+      <p>Welcome, {user.email}</p>
+      <button onClick={signOut}>Sign out</button>
+    </div>
+  )
+}
+```
+
+### Hook return values
+
+<ParamField path="user" type="User | null">
+  The currently authenticated user, or `null` if not authenticated.
+</ParamField>
+
+<ParamField path="loading" type="boolean">
+  `true` while checking for an existing session on initial load. Use this to show a loading state.
+</ParamField>
+
+<ParamField path="signOut" type="() => Promise<void>">
+  Function to sign the current user out. This clears the session and updates the auth state.
+</ParamField>
+
+## Sign up flow
+
+Users create accounts through the signup screen, which uses the `useSignup` hook:
+
+```typescript src/features/auth/api/use-signup.ts
+import { useMutation } from '@tanstack/react-query'
+import { supabase } from '@shared/services/supabase-client'
+
+interface SignupPayload {
+  email: string
+  password: string
+}
+
+export function useSignup() {
+  return useMutation({
+    mutationFn: async ({ email, password }: SignupPayload) => {
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) throw error
+      return data
+    },
+  })
+}
+```
+
+<Steps>
+  <Step title="User submits the form">
+    The signup form collects email and password, validates them, and calls `useSignup`.
+  </Step>
+
+  <Step title="Supabase creates the user">
+    The `signUp()` method creates a new user in Supabase Auth.
+  </Step>
+
+  <Step title="Email confirmation (optional)">
+    If email confirmation is enabled in Supabase, the user receives a confirmation email. Otherwise, they're immediately authenticated.
+  </Step>
+
+  <Step title="Auth state updates">
+    The `onAuthStateChange` listener fires, updating the `AuthProvider` with the new user.
+  </Step>
+
+  <Step title="Navigation">
+    The user is redirected to the dashboard.
+  </Step>
+</Steps>
+
+## Sign in flow
+
+Returning users sign in using the `useLogin` hook:
+
+```typescript src/features/auth/api/use-login.ts
+import { useMutation } from '@tanstack/react-query'
+import { supabase } from '@shared/services/supabase-client'
+
+interface LoginPayload {
+  email: string
+  password: string
+}
+
+export function useLogin() {
+  return useMutation({
+    mutationFn: async ({ email, password }: LoginPayload) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      return data
+    },
+  })
+}
+```
+
+<Steps>
+  <Step title="User submits credentials">
+    The login form calls `useLogin` with email and password.
+  </Step>
+
+  <Step title="Supabase validates credentials">
+    The `signInWithPassword()` method checks the credentials against the database.
+  </Step>
+
+  <Step title="Session created">
+    If valid, Supabase creates a session and stores it in localStorage.
+  </Step>
+
+  <Step title="Auth state updates">
+    The `onAuthStateChange` listener fires, updating the auth context.
+  </Step>
+
+  <Step title="Navigation">
+    The user is redirected to the dashboard.
+  </Step>
+</Steps>
+
+## Route protection
+
+Goalst uses an `AuthGuard` component to protect authenticated routes:
+
+```typescript src/features/auth/guards/auth-guard.tsx
+import { Navigate, Outlet } from 'react-router-dom'
+import { useAuth } from '../providers/auth-provider'
+import { ROUTES } from '@shared/constants/routes'
+
+export function AuthGuard() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to={ROUTES.LOGIN} replace />
+  }
+
+  return <Outlet />
+}
+```
+
+### How it works
+
+<Steps>
+  <Step title="Check loading state">
+    While `loading` is `true`, display a loading spinner. This prevents flickering during session restoration.
+  </Step>
+
+  <Step title="Check authentication">
+    If no user exists after loading completes, redirect to the login page.
+  </Step>
+
+  <Step title="Render protected route">
+    If authenticated, render the `<Outlet />` component, which displays the protected route's content.
+  </Step>
+</Steps>
+
+### Usage in routes
+
+Wrap protected routes with the `AuthGuard`:
+
+```typescript
+import { AuthGuard } from '@features/auth/guards/auth-guard'
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <AuthGuard />,
+    children: [
+      { path: 'dashboard', element: <DashboardScreen /> },
+      { path: 'goals', element: <GoalsScreen /> },
+      // Other protected routes
+    ],
+  },
+  { path: '/login', element: <LoginScreen /> },
+  { path: '/signup', element: <SignupScreen /> },
+])
+```
+
+## Guest guard
+
+The opposite of `AuthGuard`, the `GuestGuard` redirects authenticated users away from public pages like login and signup.
+
+<Note>
+  Use `GuestGuard` on routes like `/login` and `/signup` to prevent authenticated users from accessing them.
+</Note>
+
+## Sign out
+
+Users can sign out from any component with access to the auth context:
+
+```typescript
+const { signOut } = useAuth()
+
+await signOut()
+```
+
+This:
+1. Calls `supabase.auth.signOut()` to clear the session
+2. Updates the auth context to set `user` to `null`
+3. Triggers a redirect to the login page (if on a protected route)
+
+## Session management
+
+Supabase handles session management automatically:
+
+- **Storage**: Sessions are stored in localStorage by default
+- **Expiration**: Sessions expire after a configurable period (default: 1 hour)
+- **Refresh**: Supabase automatically refreshes tokens before expiration
+- **Cross-tab sync**: Auth state syncs across browser tabs
+
+<Warning>
+  If you clear localStorage, users will be signed out. This is expected behavior.
+</Warning>
+
+## Error handling
+
+Both `useLogin` and `useSignup` throw errors that can be caught:
+
+```typescript
+try {
+  await login.mutateAsync({ email, password })
+  navigate(ROUTES.DASHBOARD)
+} catch (err) {
+  setError(err instanceof Error ? err.message : 'Login failed')
+}
+```
+
+Common errors:
+
+| Error | Cause |
+|-------|-------|
+| `Invalid login credentials` | Wrong email or password |
+| `Email not confirmed` | User hasn't verified their email |
+| `User already registered` | Email already exists (signup) |
+
+## Security best practices
+
+<CardGroup cols={2}>
+  <Card title="Use HTTPS in production" icon="shield">
+    Always serve your application over HTTPS to prevent session hijacking.
+  </Card>
+  <Card title="Enable email confirmation" icon="envelope">
+    Require email verification for new accounts to prevent abuse.
+  </Card>
+  <Card title="Implement password requirements" icon="key">
+    Enforce minimum password length and complexity.
+  </Card>
+  <Card title="Use Row Level Security" icon="database">
+    Configure RLS policies in Supabase to protect user data.
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<Card title="Deployment" icon="rocket" href="/guides/deployment">
+  Deploy your authenticated Goalst application to production
+</Card>

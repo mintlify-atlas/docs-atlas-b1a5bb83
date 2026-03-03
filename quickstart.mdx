@@ -1,80 +1,208 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Create your account and set up your first goal with nested sub-goals in under 5 minutes
 ---
 
-## Get started in three steps
+## Create your account
 
-Get your documentation site running locally and make your first customization.
+<Steps>
+  <Step title="Sign up">
+    Navigate to the Goalst signup page and create your account with your email and a password (minimum 6 characters).
 
-### Step 1: Set up your local environment
+    <Note>
+      Your password must be at least 6 characters long. You'll be asked to confirm it during signup.
+    </Note>
+  </Step>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Verify your email">
+    Check your inbox for a verification email from Goalst. Click the link to verify your account.
+  </Step>
 
-### Step 2: Deploy your changes
+  <Step title="Access your dashboard">
+    Once verified, you'll be automatically logged in and redirected to your dashboard where you can start creating goals.
+  </Step>
+</Steps>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Create your first goal
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+Now that you're logged in, let's create your first goal.
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Open the goal creation modal">
+    Click the **New goal** button in the top-right corner of your dashboard.
+  </Step>
 
-### Step 3: Go live
+  <Step title="Fill in goal details">
+    Enter the following information about your goal:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    - **Title** (required) — What you want to achieve (e.g., "Complete fitness transformation")
+    - **Description** (optional) — More details about your goal
+    - **Start date** — Defaults to today if you leave it blank
+    - **End date** — Your target deadline (optional)
+    - **Color tag** — Choose a color to help visually organize your goals
+    - **Priority** — Set a value from 1-20
+
+    <Note>
+      **Priority affects your score.** When you complete a goal, you earn points equal to its priority value. Higher-priority goals = more points = faster rank progression.
+    </Note>
+
+    Here's an example goal:
+
+    ```text
+    Title: Launch my side project
+    Description: Take my app idea from concept to production
+    Start date: 2026-03-01
+    End date: 2026-06-30
+    Color tag: Sky blue
+    Priority: 15
+    ```
+  </Step>
+
+  <Step title="Create the goal">
+    Click **Create goal** to save your goal. You'll be redirected to the goal detail page.
+  </Step>
+</Steps>
+
+## Break it down with sub-goals
+
+The power of Goalst is in breaking big goals into smaller, manageable sub-goals.
+
+<Steps>
+  <Step title="Navigate to your goal">
+    From your dashboard, click on the goal card you just created. This opens the goal detail view.
+  </Step>
+
+  <Step title="Add your first sub-goal">
+    In the **Sub-goals** section, click **Add sub-goal**. 
+
+    Enter a title for your sub-goal and set its priority using the slider (1-20). For example:
+
+    ```text
+    Sub-goal: Design user interface
+    Priority: 8
+    ```
+
+    Click **Add** to create the sub-goal.
+  </Step>
+
+  <Step title="Add more sub-goals">
+    Continue adding sub-goals to break down your main goal. Some examples:
+
+    - Set up development environment
+    - Build core features
+    - Write documentation
+    - Deploy to production
+
+    <Note>
+      You can add as many sub-goals as you need. Each one helps make your main goal less overwhelming.
+    </Note>
+  </Step>
+
+  <Step title="Nest sub-goals deeper">
+    You can break down sub-goals into even smaller tasks. Click the arrow next to a sub-goal to expand it, then click **Add sub-goal** under that item.
+
+    For example, under "Build core features" you might add:
+    - User authentication
+    - Data storage setup
+    - API integration
+  </Step>
+</Steps>
+
+## Track your progress
+
+<Steps>
+  <Step title="Mark sub-goals as complete">
+    As you complete tasks, click the checkbox next to each sub-goal to mark it as done.
+
+    When you check off a sub-goal, you'll see:
+    - The progress bar fills up
+    - The progress percentage increases
+    - Your main goal's overall progress updates automatically
+  </Step>
+
+  <Step title="Watch your main goal progress">
+    Your main goal's progress is calculated automatically based on completed sub-goals.
+
+    The progress bar uses color coding:
+    - **Gray** (0-29%) — Just getting started
+    - **Yellow** (30-59%) — Making progress
+    - **Light green** (60-99%) — Almost there
+    - **Green** (100%) — Completed!
+  </Step>
+
+  <Step title="Update goal status">
+    You can manually change your goal's status using the status dropdown:
+    - **Not started** — Haven't begun yet
+    - **In progress** — Actively working on it
+    - **Completed** — Finished!
+    - **Abandoned** — No longer pursuing this goal
+  </Step>
+</Steps>
+
+## View your score and rank
+
+<Steps>
+  <Step title="Check your dashboard stats">
+    Return to your dashboard to see your statistics:
+    - **Total goals** — How many goals you're tracking
+    - **Completed** — Goals you've finished
+    - **In progress** — Goals you're actively working on
+    - **Overdue** — Goals past their deadline that aren't complete yet
+  </Step>
+
+  <Step title="Monitor your rank progression">
+    Your rank appears in the sidebar of your dashboard. It shows:
+    - Your current rank emoji and name (you start as a **Rookie** )
+    - Your total score points
+    - Progress toward the next rank
+
+    The rank ladder:
+    - Rookie (0-49 points)
+    - Hustler (50-149 points)
+    - Achiever (150-349 points)
+    - Go-Getter (350-699 points)
+    - Champion (700-1499 points)
+    - Legend (1500+ points)
+
+    <Note>
+      You earn points equal to a goal's priority value when you complete it. So a priority-10 goal gives you 10 points!
+    </Note>
+  </Step>
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card
+    title="Share your goals"
+    icon="share-nodes"
+    iconType="duotone"
+    href="/features/sharing"
+  >
+    Generate share links to let others view your progress and hold you accountable.
+  </Card>
+  <Card
+    title="Use templates"
+    icon="book"
+    iconType="duotone"
+    href="/features/templates"
+  >
+    Speed up goal creation with starter templates or save your own structures to reuse.
+  </Card>
+  <Card
+    title="Collaborate with others"
+    icon="users"
+    iconType="duotone"
+    href="/features/collaboration"
+  >
+    Invite team members to work on goals together with role-based permissions.
+  </Card>
+  <Card
+    title="Track progress"
+    icon="chart-line"
+    iconType="duotone"
+    href="/features/progress-tracking"
+  >
+    Learn how progress is calculated automatically from your completed sub-goals.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

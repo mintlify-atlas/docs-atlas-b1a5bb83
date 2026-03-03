@@ -1,0 +1,329 @@
+---
+title: Using and creating goal templates
+description: Save goal structures as reusable templates to streamline your workflow
+---
+
+Goal templates let you save the structure of a goal so you can reuse it later. Templates are perfect for recurring projects, standardized workflows, or common goal patterns you use frequently.
+
+## What are templates
+
+A template is a saved goal structure that you can instantiate into a new goal:
+
+```typescript
+interface GoalTemplate {
+  id: string
+  user_id: string
+  name: string
+  structure: Partial<Goal>    // The goal fields to reuse
+  created_at: string
+}
+```
+
+Templates store:
+
+- Title and description
+- Status (usually "not_started")
+- Priority and color tag
+- Any other goal properties you want to reuse
+
+Templates do NOT store:
+
+- Sub-goals (only the parent goal structure)
+- Dates (start and end dates are set when creating from template)
+- Collaborators or share links
+- Progress or completion data
+
+<Note>
+  Templates are per-user. You cannot share templates with other users (though you could share a goal created from a template).
+</Note>
+
+## Starter templates
+
+Goalst includes three built-in starter templates to get you going:
+
+<CardGroup cols={3}>
+  <Card title="Fitness Plan" icon="dumbbell">
+    Title: "Fitness Plan"  
+    Description: "Get fit and healthy"  
+    Use for: Health and wellness goals
+  </Card>
+  
+  <Card title="Book a Trip" icon="plane">
+    Title: "Book a Trip"  
+    Description: "Plan and book your next trip"  
+    Use for: Travel planning
+  </Card>
+  
+  <Card title="Launch a Project" icon="rocket">
+    Title: "Launch a Project"  
+    Description: "Take a project from idea to launch"  
+    Use for: Product launches or initiatives
+  </Card>
+</CardGroup>
+
+```typescript
+const STARTER_TEMPLATES = [
+  {
+    id: 'starter-fitness',
+    name: 'Fitness Plan',
+    structure: {
+      title: 'Fitness Plan',
+      description: 'Get fit and healthy',
+      status: 'not_started',
+    } as Partial<Goal>,
+  },
+  // ...
+]
+```
+
+Starter templates are always available and cannot be deleted.
+
+## Creating a template
+
+You can save a new template from the Templates page:
+
+<Steps>
+  <Step title="Navigate to Templates">
+    Click "Templates" in your app navigation to open the templates screen.
+  </Step>
+  
+  <Step title="Click 'Save template'">
+    Click the "Save template" button in the top-right corner.
+  </Step>
+  
+  <Step title="Enter template details">
+    Provide a name for your template (e.g., "My workout plan", "Quarterly review").
+    
+    ```typescript
+    export function useSaveTemplate() {
+      const qc = useQueryClient()
+      return useMutation({
+        mutationFn: async ({ name, goal }: { name: string; goal: Partial<Goal> }) => {
+          const { data: { user } } = await supabase.auth.getUser()
+          const { data, error } = await supabase
+            .from('goalst_templates')
+            .insert({ name, structure: goal, user_id: user!.id })
+            .select()
+            .single()
+          if (error) throw error
+          return data as GoalTemplate
+        },
+      })
+    }
+    ```
+  </Step>
+  
+  <Step title="Save">
+    Click "Save" to create the template. It appears in your "My templates" section.
+  </Step>
+</Steps>
+
+<Note>
+  Currently, templates are created with just a name. Future versions may allow saving an existing goal as a template to preserve all its properties.
+</Note>
+
+## Using a template
+
+To create a goal from a template:
+
+<Steps>
+  <Step title="Find the template">
+    Browse your saved templates or starter templates on the Templates page.
+  </Step>
+  
+  <Step title="Click 'Use template'">
+    Click the "Use template" button on the template card.
+  </Step>
+  
+  <Step title="Goal is created">
+    A new goal is created with the template's structure. The app navigates you to the new goal's detail page.
+    
+    ```typescript
+    async function useTemplate(structure: Partial<Goal>) {
+      const { data: { user } } = await supabase.auth.getUser()
+      const goal = await createGoal.mutateAsync({
+        ...structure,
+        user_id: user!.id,
+        parent_goal_id: null,
+        start_date: structure.start_date ?? new Date().toISOString().split('T')[0],
+        manual_progress: 0,
+        is_recurring: false,
+        recurrence_cadence: null,
+      })
+      navigate(goalDetailPath(goal.id))
+    }
+    ```
+  </Step>
+  
+  <Step title="Customize the new goal">
+    Edit the goal to add dates, sub-goals, or any other details specific to this instance.
+  </Step>
+</Steps>
+
+<Note>
+  Creating a goal from a template does not create a link between them. Editing the goal doesn't affect the template, and vice versa.
+</Note>
+
+## Template structure
+
+The `structure` field is a `Partial<Goal>` that contains the fields you want to reuse:
+
+```typescript
+interface GoalTemplate {
+  structure: Partial<Goal>
+}
+
+// Example structure
+{
+  title: "Launch a Project",
+  description: "Take a project from idea to launch",
+  status: "not_started",
+  priority: 10,
+  color_tag: "#0284c7"
+}
+```
+
+When creating from a template, these fields are copied to the new goal. Fields not in the structure get default values:
+
+- `start_date`: Today's date
+- `end_date`: null
+- `manual_progress`: 0
+- `is_recurring`: false
+- `priority`: Copied from template or defaults to 1
+
+## Managing templates
+
+You can manage your saved templates from the Templates page:
+
+### Viewing templates
+
+Templates are organized into two sections:
+
+1. **Starter templates** - Built-in templates, always visible
+2. **My templates** - Your saved templates, sorted by creation date (newest first)
+
+```typescript
+export function useTemplates() {
+  return useQuery({
+    queryKey: ['templates'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('goalst_templates')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data as GoalTemplate[]
+    },
+  })
+}
+```
+
+### Deleting templates
+
+To delete a template:
+
+1. Find the template in your "My templates" section
+2. Click the trash icon in the top-right corner of the template card
+3. The template is deleted immediately (no confirmation)
+
+```typescript
+export function useDeleteTemplate() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      const { error } = await supabase
+        .from('goalst_templates')
+        .delete()
+        .eq('id', templateId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['templates'] })
+    },
+  })
+}
+```
+
+<Warning>
+  Deleting a template does not affect goals created from it. They remain unchanged.
+</Warning>
+
+## Empty state
+
+If you haven't created any templates yet, you'll see an empty state:
+
+```tsx
+<EmptyState
+  icon={<BookTemplate size={40} />}
+  title="No saved templates"
+  description="Save a goal structure as a template to reuse it later."
+/>
+```
+
+Starter templates are always visible, so the empty state only applies to the "My templates" section.
+
+## Use cases for templates
+
+<CardGroup cols={2}>
+  <Card title="Recurring projects" icon="rotate">
+    Save structures for quarterly reviews, monthly reports, or annual planning cycles.
+  </Card>
+  
+  <Card title="Standardized workflows" icon="list-check">
+    Create templates for onboarding new team members, product launches, or event planning.
+  </Card>
+  
+  <Card title="Personal routines" icon="user">
+    Template your weekly workout plan, meal prep checklist, or study schedule.
+  </Card>
+  
+  <Card title="Client work" icon="briefcase">
+    Save goal structures you use for every client project to ensure consistency.
+  </Card>
+</CardGroup>
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Use descriptive names" icon="tag">
+    Name templates clearly so you can identify them later (e.g., "Q1 Product Launch" not "Template 1").
+  </Card>
+  
+  <Card title="Keep templates generic" icon="wand-magic-sparkles">
+    Don't include instance-specific details. Templates should work for multiple use cases.
+  </Card>
+  
+  <Card title="Set reasonable priorities" icon="balance-scale">
+    Choose a default priority that makes sense for most instances of the template.
+  </Card>
+  
+  <Card title="Use color tags" icon="palette">
+    Color-code templates by category to make them easier to scan visually.
+  </Card>
+</CardGroup>
+
+## Future enhancements
+
+Templates currently have basic functionality. Potential future features:
+
+- **Save existing goals as templates** - Right-click a goal to save it as a template
+- **Template sub-goal structures** - Save the entire goal hierarchy, not just the parent
+- **Template sharing** - Share templates with other users or make them public
+- **Template variables** - Placeholder fields like `{{project_name}}` that get filled in when using the template
+- **Template categories** - Organize templates into folders or categories
+
+<Note>
+  Want to see a feature? Reach out to the Goalst team with your use case and feedback.
+</Note>
+
+## Related features
+
+<CardGroup cols={2}>
+  <Card title="Goals" icon="target" href="/features/goals">
+    Learn about creating and managing goals
+  </Card>
+  
+  <Card title="Nested goals" icon="sitemap" href="/features/nested-goals">
+    Build goal hierarchies with sub-goals
+  </Card>
+</CardGroup>

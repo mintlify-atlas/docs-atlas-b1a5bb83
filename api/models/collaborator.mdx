@@ -1,0 +1,81 @@
+---
+title: Collaborator
+description: The Collaborator data model represents a user who has access to a goal
+---
+
+The `Collaborator` interface represents a user who has been granted access to collaborate on a goal. Collaborators can have different roles that determine their permissions.
+
+## Properties
+
+<ResponseField name="goal_id" type="string" required>
+  ID of the goal this collaboration is for
+</ResponseField>
+
+<ResponseField name="user_id" type="string" required>
+  ID of the user who is collaborating on the goal
+</ResponseField>
+
+<ResponseField name="role" type="CollaboratorRole" required>
+  The role assigned to this collaborator.
+  
+  **Enum values:**
+  - `viewer` - Can view the goal but not edit
+  - `editor` - Can view and edit the goal
+  - `owner` - Full control over the goal including deletion and access management
+</ResponseField>
+
+<ResponseField name="invited_at" type="string" required>
+  ISO 8601 timestamp when the collaboration invitation was sent
+</ResponseField>
+
+<ResponseField name="joined_at" type="string | null" required>
+  ISO 8601 timestamp when the user accepted the invitation, or `null` if not yet accepted
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  User details (computed/joined field)
+  
+  <Expandable title="properties">
+    <ResponseField name="id" type="string" required>
+      User's unique identifier
+    </ResponseField>
+    
+    <ResponseField name="email" type="string" required>
+      User's email address
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+```json
+{
+  "goal_id": "goal_123",
+  "user_id": "user_789",
+  "role": "editor",
+  "invited_at": "2026-02-15T10:00:00Z",
+  "joined_at": "2026-02-15T11:30:00Z",
+  "user": {
+    "id": "user_789",
+    "email": "collaborator@example.com"
+  }
+}
+```
+
+## Type definitions
+
+```typescript
+export type CollaboratorRole = 'viewer' | 'editor' | 'owner'
+
+export interface Collaborator {
+  goal_id: string
+  user_id: string
+  role: CollaboratorRole
+  invited_at: string
+  joined_at: string | null
+  user?: {
+    id: string
+    email: string
+  }
+}
+```

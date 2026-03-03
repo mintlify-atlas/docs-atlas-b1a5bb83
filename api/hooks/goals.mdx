@@ -1,0 +1,301 @@
+---
+title: Goals hooks
+description: React hooks for managing goals and sub-goals
+---
+
+React hooks for fetching and mutating goals data using React Query.
+
+## useGoals
+
+Fetch all top-level goals for the current user.
+
+```typescript
+const { data, isLoading, error } = useGoals()
+```
+
+### Returns
+
+<ParamField path="data" type="Goal[]">
+  Array of top-level goals (goals without a parent), ordered by end date
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed
+</ParamField>
+
+### Example
+
+```typescript
+import { useGoals } from '@features/goals/api/use-goals'
+
+function GoalsList() {
+  const { data: goals, isLoading } = useGoals()
+  
+  if (isLoading) return <div>Loading...</div>
+  
+  return (
+    <ul>
+      {goals?.map((goal) => (
+        <li key={goal.id}>{goal.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## useGoal
+
+Fetch a single goal by ID.
+
+```typescript
+const { data, isLoading, error } = useGoal(goalId)
+```
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal to fetch
+</ParamField>
+
+### Returns
+
+<ParamField path="data" type="Goal">
+  The goal object
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed
+</ParamField>
+
+### Example
+
+```typescript
+import { useGoal } from '@features/goals/api/use-goals'
+
+function GoalDetail({ goalId }: { goalId: string }) {
+  const { data: goal, isLoading } = useGoal(goalId)
+  
+  if (isLoading) return <div>Loading...</div>
+  
+  return <h1>{goal?.title}</h1>
+}
+```
+
+## useSubGoals
+
+Fetch all sub-goals for a parent goal.
+
+```typescript
+const { data, isLoading, error } = useSubGoals(parentId)
+```
+
+### Parameters
+
+<ParamField path="parentId" type="string" required>
+  The ID of the parent goal
+</ParamField>
+
+### Returns
+
+<ParamField path="data" type="Goal[]">
+  Array of sub-goals, ordered by creation date
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed
+</ParamField>
+
+### Example
+
+```typescript
+import { useSubGoals } from '@features/goals/api/use-goals'
+
+function SubGoalsList({ parentId }: { parentId: string }) {
+  const { data: subGoals } = useSubGoals(parentId)
+  
+  return (
+    <ul>
+      {subGoals?.map((subGoal) => (
+        <li key={subGoal.id}>{subGoal.title}</li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## useCreateGoal
+
+Create a new goal.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useCreateGoal()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(payload: Partial<Goal>) => void">
+  Function to create a goal
+</ParamField>
+
+<ParamField path="mutateAsync" type="(payload: Partial<Goal>) => Promise<Goal>">
+  Async function to create a goal and await the result
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Payload
+
+<ParamField path="payload" type="Partial<Goal>" required>
+  Goal data to create. Common fields include:
+  - `title`: string
+  - `description`: string
+  - `end_date`: string (ISO date)
+  - `parent_goal_id`: string (for sub-goals)
+  - `status`: 'not_started' | 'in_progress' | 'completed'
+</ParamField>
+
+### Example
+
+```typescript
+import { useCreateGoal } from '@features/goals/api/use-goals'
+
+function CreateGoalForm() {
+  const { mutate: createGoal, isPending } = useCreateGoal()
+  
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    
+    createGoal({
+      title: formData.get('title') as string,
+      description: formData.get('description') as string,
+      end_date: formData.get('endDate') as string,
+      status: 'not_started',
+    })
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="title" required />
+      <textarea name="description" />
+      <input name="endDate" type="date" />
+      <button disabled={isPending}>Create Goal</button>
+    </form>
+  )
+}
+```
+
+## useUpdateGoal
+
+Update an existing goal.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useUpdateGoal()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(payload: Partial<Goal> & { id: string }) => void">
+  Function to update a goal
+</ParamField>
+
+<ParamField path="mutateAsync" type="(payload: Partial<Goal> & { id: string }) => Promise<Goal>">
+  Async function to update a goal and await the result
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Payload
+
+<ParamField path="id" type="string" required>
+  The ID of the goal to update
+</ParamField>
+
+<ParamField path="payload" type="Partial<Goal>">
+  Goal fields to update. The `updated_at` field is automatically set.
+</ParamField>
+
+### Example
+
+```typescript
+import { useUpdateGoal } from '@features/goals/api/use-goals'
+
+function ToggleGoalStatus({ goalId, currentStatus }: { goalId: string, currentStatus: string }) {
+  const { mutate: updateGoal } = useUpdateGoal()
+  
+  const handleToggle = () => {
+    updateGoal({
+      id: goalId,
+      status: currentStatus === 'completed' ? 'in_progress' : 'completed',
+    })
+  }
+  
+  return <button onClick={handleToggle}>Toggle Status</button>
+}
+```
+
+## useDeleteGoal
+
+Delete a goal.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useDeleteGoal()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(goalId: string) => void">
+  Function to delete a goal
+</ParamField>
+
+<ParamField path="mutateAsync" type="(goalId: string) => Promise<void>">
+  Async function to delete a goal and await completion
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal to delete
+</ParamField>
+
+### Example
+
+```typescript
+import { useDeleteGoal } from '@features/goals/api/use-goals'
+
+function DeleteGoalButton({ goalId }: { goalId: string }) {
+  const { mutate: deleteGoal, isPending } = useDeleteGoal()
+  
+  const handleDelete = () => {
+    if (confirm('Are you sure you want to delete this goal?')) {
+      deleteGoal(goalId)
+    }
+  }
+  
+  return (
+    <button onClick={handleDelete} disabled={isPending}>
+      Delete Goal
+    </button>
+  )
+}
+```

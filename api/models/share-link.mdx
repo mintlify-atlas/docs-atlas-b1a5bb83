@@ -1,0 +1,64 @@
+---
+title: Share link
+description: The ShareLink data model represents a shareable link for goal access
+---
+
+The `ShareLink` interface represents a shareable link that provides access to a goal without requiring a direct collaboration invitation. Share links can be revoked at any time.
+
+## Properties
+
+<ResponseField name="id" type="string" required>
+  Unique identifier for the share link
+</ResponseField>
+
+<ResponseField name="goal_id" type="string" required>
+  ID of the goal this share link provides access to
+</ResponseField>
+
+<ResponseField name="token" type="string" required>
+  Unique token used in the shareable URL for authentication
+</ResponseField>
+
+<ResponseField name="permission" type="SharePermission" required>
+  The permission level granted to users accessing via this link.
+  
+  **Enum values:**
+  - `view` - Read-only access to the goal
+  - `edit` - Read and write access to the goal
+</ResponseField>
+
+<ResponseField name="created_at" type="string" required>
+  ISO 8601 timestamp when the share link was created
+</ResponseField>
+
+<ResponseField name="revoked_at" type="string | null" required>
+  ISO 8601 timestamp when the share link was revoked, or `null` if still active
+</ResponseField>
+
+## Example
+
+```json
+{
+  "id": "share_123",
+  "goal_id": "goal_456",
+  "token": "a1b2c3d4e5f6g7h8i9j0",
+  "permission": "view",
+  "created_at": "2026-03-01T09:00:00Z",
+  "revoked_at": null
+}
+```
+
+## Type definitions
+
+```typescript
+export type SharePermission = 'view' | 'edit'
+
+export interface ShareLink {
+  id: string
+  goal_id: string
+  token: string
+  permission: SharePermission
+  created_at: string
+  revoked_at: string | null
+}
+```

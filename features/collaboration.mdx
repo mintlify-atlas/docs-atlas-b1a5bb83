@@ -1,0 +1,298 @@
+---
+title: Collaborating with team members
+description: Invite team members to work together on goals with role-based permissions
+---
+
+Goalst lets you invite team members to collaborate on goals. Each collaborator has a role that determines what they can do with the goal and its sub-goals.
+
+## Collaboration roles
+
+Every collaborator is assigned one of three roles:
+
+<CardGroup cols={3}>
+  <Card title="Owner" icon="crown">
+    Full control. Can edit the goal, manage collaborators, and delete the goal.
+  </Card>
+  
+  <Card title="Editor" icon="pencil">
+    Can edit the goal, sub-goals, and progress. Cannot manage collaborators or delete.
+  </Card>
+  
+  <Card title="Viewer" icon="eye">
+    Read-only access. Can view the goal and all sub-goals but cannot make changes.
+  </Card>
+</CardGroup>
+
+```typescript
+type CollaboratorRole = 'viewer' | 'editor' | 'owner'
+
+interface Collaborator {
+  goal_id: string
+  user_id: string
+  role: CollaboratorRole
+  invited_at: string
+  joined_at: string | null
+  user?: {
+    id: string
+    email: string
+  }
+}
+```
+
+<Note>
+  The user who creates a goal is automatically assigned as the owner. Each goal must have at least one owner.
+</Note>
+
+## Adding collaborators
+
+You can add collaborators from the goal detail page:
+
+<Steps>
+  <Step title="Open the share panel">
+    Navigate to a goal's detail page and find the "Collaborators" section.
+  </Step>
+  
+  <Step title="Enter email address">
+    Type the email address of the person you want to invite. They must already have a Goalst account.
+    
+    ```typescript
+    // Look up user by email
+    const { data: userData } = await supabase
+      .from('goalst_user_emails')
+      .select('id')
+      .eq('email', email)
+      .single()
+    ```
+    
+    <Warning>
+      If the email isn't found in the system, you'll see an error: "No user found with that email". Ask them to sign up first.
+    </Warning>
+  </Step>
+  
+  <Step title="Choose a role">
+    Select whether the collaborator should be a Viewer or Editor. You cannot assign additional Owners.
+  </Step>
+  
+  <Step title="Send invitation">
+    Click "Add" to invite the collaborator. They'll be added immediately and can access the goal.
+  </Step>
+</Steps>
+
+## Managing collaborators
+
+The collaborators list shows all users with access to the goal:
+
+```tsx
+export function SharePanel({ goalId }: SharePanelProps) {
+  const { data: collaborators = [] } = useCollaborators(goalId)
+  
+  return (
+    <div>
+      {collaborators.map((c) => (
+        <div key={c.user_id}>
+          <span>{c.user?.email ?? c.user_id}</span>
+          <Badge variant={roleVariant[c.role]}>{c.role}</Badge>
+          {c.role !== 'owner' && (
+            <button onClick={() => removeCollaborator.mutate({ goalId, userId: c.user_id })}>
+              Remove
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+Each collaborator row displays:
+
+- **Avatar** - First letter of their email in a colored circle
+- **Email address** - The collaborator's account email
+- **Role badge** - Color-coded by role (green for owner, yellow for editor, gray for viewer)
+- **Remove button** - Delete icon to remove the collaborator (not shown for owners)
+
+<Warning>
+  You cannot remove the owner role. If you need to transfer ownership, you'll need to do so through the database directly.
+</Warning>
+
+## Permission checks
+
+Collaboration permissions affect what users can do:
+
+### Goal editing
+
+- **Owners and Editors**: Can update title, description, dates, status, priority, and color
+- **Viewers**: Can only view these fields
+
+### Sub-goals
+
+- **Owners and Editors**: Can create, edit, complete, and delete sub-goals at any level
+- **Viewers**: Can see the sub-goal tree but all editing is disabled
+
+```typescript
+interface SubGoalTreeProps {
+  parentId: string
+  canEdit: boolean  // Derived from user's role
+}
+```
+
+### Comments
+
+- **All roles**: Can read comments
+- **All roles**: Can add new comments (commenting is always allowed)
+
+### Share links
+
+- **Owners**: Can create and revoke share links
+- **Editors**: Can view existing links but cannot create or revoke
+- **Viewers**: Cannot access the share panel
+
+### Collaborators
+
+- **Owners**: Can add and remove collaborators
+- **Editors and Viewers**: Can see the collaborator list but cannot modify it
+
+## Removing collaborators
+
+Owners can remove any non-owner collaborator:
+
+```typescript
+export function useRemoveCollaborator() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ goalId, userId }: { goalId: string; userId: string }) => {
+      const { error } = await supabase
+        .from('goalst_collaborators')
+        .delete()
+        .eq('goal_id', goalId)
+        .eq('user_id', userId)
+      if (error) throw error
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['collaborators', variables.goalId] })
+    },
+  })
+}
+```
+
+1. Hover over a collaborator in the list
+2. Click the X icon that appears
+3. The collaborator is removed immediately and loses access to the goal
+
+<Note>
+  Removed collaborators do not receive a notification. They'll simply see the goal disappear from their dashboard.
+</Note>
+
+## Updating roles
+
+You can change a collaborator's role after they've been added:
+
+```typescript
+export function useUpdateCollaboratorRole() {
+  return useMutation({
+    mutationFn: async ({
+      goalId,
+      userId,
+      role,
+    }: {
+      goalId: string
+      userId: string
+      role: CollaboratorRole
+    }) => {
+      const { error } = await supabase
+        .from('goalst_collaborators')
+        .update({ role })
+        .eq('goal_id', goalId)
+        .eq('user_id', userId)
+      if (error) throw error
+    },
+  })
+}
+```
+
+Role changes take effect immediately. The collaborator's permissions update without requiring them to refresh.
+
+## Collaboration vs. sharing
+
+Goalst has two ways to give others access to your goals:
+
+<CardGroup cols={2}>
+  <Card title="Collaborators" icon="users">
+    **Account required** - Invited by email  
+    **Persistent access** - Ongoing access to the goal  
+    **Identity tracked** - Edits show their email  
+    **Dashboard integration** - Goal appears in their dashboard
+  </Card>
+  
+  <Card title="Share links" icon="link">
+    **No account required** - Anyone with the link  
+    **Temporary access** - Can be revoked anytime  
+    **Anonymous** - Viewers appear as "Guest"  
+    **Standalone view** - Separate page, not in dashboard
+  </Card>
+</CardGroup>
+
+<Note>
+  Use **collaborators** for team members working together. Use **share links** for external stakeholders, clients, or one-time sharing.
+</Note>
+
+## Real-time updates
+
+When a collaborator makes changes to a goal:
+
+- Other users see updates after refreshing or re-querying
+- Query invalidation keeps data in sync:
+
+```typescript
+onSuccess: (_data, variables) => {
+  qc.invalidateQueries({ queryKey: ['goal', variables.id] })
+  qc.invalidateQueries({ queryKey: GOALS_QUERY_KEY })
+  if (variables.parent_goal_id) {
+    qc.invalidateQueries({ queryKey: ['sub-goals', variables.parent_goal_id] })
+  }
+}
+```
+
+<Note>
+  Goalst uses React Query for caching and invalidation. Changes propagate to all users through query refetching, not websockets.
+</Note>
+
+## Visibility and scoring
+
+Collaboration affects visibility and scoring:
+
+- **Dashboard**: Goals you own or collaborate on appear in your dashboard
+- **Scoring**: Only the goal owner earns score points for completion
+- **Sub-goals**: Collaborators can create sub-goals that inherit the parent's collaboration settings
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Use appropriate roles" icon="shield-check">
+    Grant Editor only to people who need to make changes. Use Viewer for stakeholders.
+  </Card>
+  
+  <Card title="Review regularly" icon="users-cog">
+    Periodically audit your collaborator lists and remove people who no longer need access.
+  </Card>
+  
+  <Card title="Communicate externally" icon="comment">
+    Goalst doesn't send email notifications. Tell collaborators when you add them.
+  </Card>
+  
+  <Card title="Prefer collaborators over share links" icon="user-plus">
+    For team members, use collaborators instead of share links for better tracking and integration.
+  </Card>
+</CardGroup>
+
+## Related features
+
+<CardGroup cols={2}>
+  <Card title="Sharing" icon="share-nodes" href="/features/sharing">
+    Share goals via public or private links without requiring an account
+  </Card>
+  
+  <Card title="Goals" icon="target" href="/features/goals">
+    Learn about creating and managing goals
+  </Card>
+</CardGroup>

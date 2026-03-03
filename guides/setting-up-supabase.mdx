@@ -1,0 +1,218 @@
+---
+title: Setting up Supabase
+description: Configure your Supabase backend for authentication and data storage
+---
+
+Goalst uses Supabase as its backend service for authentication, database, and real-time features. This guide will walk you through setting up your Supabase project and connecting it to your Goalst application.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- A Supabase account (sign up at [supabase.com](https://supabase.com))
+- Node.js 18+ installed
+- The Goalst source code cloned to your machine
+
+## Create a Supabase project
+
+<Steps>
+  <Step title="Create a new project">
+    Log in to your Supabase dashboard and create a new project. You'll need to provide:
+    
+    - Project name
+    - Database password (save this securely)
+    - Region (choose one closest to your users)
+  </Step>
+
+  <Step title="Wait for project provisioning">
+    Supabase will provision your project infrastructure. This typically takes 1-2 minutes.
+  </Step>
+
+  <Step title="Access your project settings">
+    Once ready, navigate to **Settings** > **API** in your Supabase dashboard.
+  </Step>
+</Steps>
+
+## Get your API credentials
+
+You'll need two values from the API settings page:
+
+<Note>
+  Keep your API keys secure. Never commit them to version control or expose them publicly.
+</Note>
+
+### Project URL
+
+Your project URL follows this format:
+
+```
+https://your-project-id.supabase.co
+```
+
+Copy this value from the **Project URL** field.
+
+### Anonymous key
+
+The anon (anonymous) key is a public key that allows client-side access to your Supabase project with Row Level Security (RLS) policies enforced.
+
+Copy the **anon** **public** key from the **Project API keys** section.
+
+<Warning>
+  Do not use the `service_role` key in your frontend application. It bypasses all security rules and should only be used in secure backend environments.
+</Warning>
+
+## Configure environment variables
+
+Goalst uses environment variables to store your Supabase credentials securely.
+
+<Steps>
+  <Step title="Copy the example file">
+    Navigate to your Goalst source directory and copy the example environment file:
+
+    ```bash
+    cp .env.example .env
+    ```
+  </Step>
+
+  <Step title="Add your credentials">
+    Open `.env` in your editor and replace the placeholder values:
+
+    ```bash .env
+    VITE_SUPABASE_URL=https://your-project-id.supabase.co
+    VITE_SUPABASE_ANON_KEY=your_anon_key_here
+    ```
+
+    Replace:
+    - `https://your-project-id.supabase.co` with your actual Project URL
+    - `your_anon_key_here` with your actual anon key
+  </Step>
+
+  <Step title="Verify the configuration">
+    The environment variables are accessed in the app through Vite's `import.meta.env`:
+
+    ```typescript src/shared/constants/supabase.ts
+    export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+    export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+    ```
+  </Step>
+</Steps>
+
+## Supabase client initialization
+
+Goalst initializes the Supabase client once and exports it for use throughout the application:
+
+```typescript src/shared/services/supabase-client.ts
+import { createClient } from '@supabase/supabase-js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@shared/constants/supabase'
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+```
+
+This client instance is used for:
+- Authentication (sign up, sign in, sign out)
+- Database queries
+- Real-time subscriptions
+- Storage operations
+
+## Enable authentication providers
+
+By default, Goalst uses email/password authentication. To enable additional providers:
+
+<Steps>
+  <Step title="Navigate to Authentication settings">
+    In your Supabase dashboard, go to **Authentication** > **Providers**.
+  </Step>
+
+  <Step title="Configure email authentication">
+    Ensure **Email** is enabled. You can customize:
+    
+    - Email confirmation (recommended for production)
+    - Password requirements
+    - Email templates
+  </Step>
+
+  <Step title="(Optional) Enable OAuth providers">
+    To add social login, enable providers like:
+    
+    - Google
+    - GitHub
+    - Discord
+    
+    Each provider requires OAuth credentials from their respective platforms.
+  </Step>
+</Steps>
+
+## Set up database tables
+
+<Note>
+  Goalst requires specific database tables and Row Level Security policies. Refer to your database migration files or schema documentation for the complete setup.
+</Note>
+
+At minimum, you'll need:
+
+- User profiles table
+- Goals table
+- Sub-goals table (for recursive goal structure)
+
+You can create these using Supabase's SQL Editor or through migrations.
+
+## Test your connection
+
+To verify your Supabase configuration:
+
+<Steps>
+  <Step title="Start the development server">
+    ```bash
+    npm run dev
+    ```
+  </Step>
+
+  <Step title="Open the application">
+    Navigate to `http://localhost:4422` in your browser.
+  </Step>
+
+  <Step title="Try signing up">
+    Create a new account. If successful, your Supabase configuration is working correctly.
+  </Step>
+
+  <Step title="Check Supabase dashboard">
+    Go to **Authentication** > **Users** in your Supabase dashboard. You should see your new user listed.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Invalid API key error
+
+If you see authentication errors:
+
+- Verify your `.env` file has the correct values
+- Ensure there are no extra spaces or quotes around the values
+- Restart your development server after changing environment variables
+
+### CORS errors
+
+If you encounter CORS issues:
+
+- Check that your local development URL (`http://localhost:4422`) is allowed in Supabase
+- Go to **Settings** > **API** > **URL Configuration**
+- Add your development URL to the allowed origins
+
+### Email confirmation issues
+
+If email confirmations aren't working:
+
+- Check your email settings in **Authentication** > **Email Templates**
+- For development, consider disabling email confirmation
+- For production, configure a custom SMTP server in **Settings** > **Auth**
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/guides/authentication">
+    Learn how authentication flows work in Goalst
+  </Card>
+  <Card title="Deployment" icon="rocket" href="/guides/deployment">
+    Deploy your Goalst application to production
+  </Card>
+</CardGroup>

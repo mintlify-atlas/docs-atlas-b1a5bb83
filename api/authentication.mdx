@@ -1,0 +1,305 @@
+---
+title: Authentication
+description: How authentication works in Goalst using Supabase Auth
+---
+
+## Overview
+
+Goalst uses Supabase Auth for user authentication, providing secure email/password authentication with session management. The authentication system is built around a React Context provider that manages auth state globally.
+
+## Authentication flow
+
+### 1. Auth provider setup
+
+The `AuthProvider` manages authentication state and exposes it through React Context:
+
+```tsx src/features/auth/providers/auth-provider.tsx
+import { createContext, useContext, useEffect, useState } from 'react'
+import { supabase } from '@shared/services/supabase-client'
+import type { User } from '@shared/types'
+
+interface AuthContextValue {
+  user: User | null
+  loading: boolean
+  signOut: () => Promise<void>
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Check for existing session on mount
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session?.user) {
+        setUser({
+          id: data.session.user.id,
+          email: data.session.user.email!,
+          created_at: data.session.user.created_at,
+        })
+      }
+      setLoading(false)
+    })
+
+    // Listen for auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email!,
+          created_at: session.user.created_at,
+        })
+      } else {
+        setUser(null)
+      }
+    })
+
+    return () => listener.subscription.unsubscribe()
+  }, [])
+
+  async function signOut() {
+    await supabase.auth.signOut()
+    setUser(null)
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+```
+
+<Note>
+  The provider checks for an existing session on mount and subscribes to auth state changes to keep the UI synchronized.
+</Note>
+
+### 2. Using the auth hook
+
+Components access auth state using the `useAuth` hook:
+
+```tsx src/features/auth/providers/auth-provider.tsx
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider')
+  return ctx
+}
+```
+
+```tsx Example usage
+import { useAuth } from '@features/auth/providers/auth-provider'
+
+function MyComponent() {
+  const { user, loading, signOut } = useAuth()
+
+  if (loading) return <LoadingSpinner />
+  if (!user) return <LoginPrompt />
+
+  return <div>Welcome {user.email}</div>
+}
+```
+
+## Authentication operations
+
+### Sign up
+
+New users register with email and password using React Query:
+
+```tsx src/features/auth/api/use-signup.ts
+import { useMutation } from '@tanstack/react-query'
+import { supabase } from '@shared/services/supabase-client'
+
+interface SignupPayload {
+  email: string
+  password: string
+}
+
+export function useSignup() {
+  return useMutation({
+    mutationFn: async ({ email, password }: SignupPayload) => {
+      const { data, error } = await supabase.auth.signUp({ email, password })
+      if (error) throw error
+      return data
+    },
+  })
+}
+```
+
+### Sign in
+
+Existing users authenticate with their credentials:
+
+```tsx src/features/auth/api/use-login.ts
+import { useMutation } from '@tanstack/react-query'
+import { supabase } from '@shared/services/supabase-client'
+
+interface LoginPayload {
+  email: string
+  password: string
+}
+
+export function useLogin() {
+  return useMutation({
+    mutationFn: async ({ email, password }: LoginPayload) => {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      return data
+    },
+  })
+}
+```
+
+### Sign out
+
+Users can sign out using the method from `useAuth`:
+
+```tsx
+const { signOut } = useAuth()
+
+await signOut()
+```
+
+## Route protection
+
+### Auth guard
+
+Protected routes use the `AuthGuard` component to ensure only authenticated users can access them:
+
+```tsx src/features/auth/guards/auth-guard.tsx
+import { Navigate, Outlet } from 'react-router-dom'
+import { useAuth } from '../providers/auth-provider'
+import { ROUTES } from '@shared/constants/routes'
+
+export function AuthGuard() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to={ROUTES.LOGIN} replace />
+  }
+
+  return <Outlet />
+}
+```
+
+### Usage in routes
+
+```tsx app.routes.tsx
+import { AuthGuard } from '@features/auth/guards/auth-guard'
+
+const router = createBrowserRouter([
+  {
+    element: <AuthGuard />,
+    children: [
+      { path: '/dashboard', element: <DashboardScreen /> },
+      { path: '/goals/:id', element: <GoalDetailScreen /> },
+    ],
+  },
+  { path: '/login', element: <LoginScreen /> },
+  { path: '/signup', element: <SignupScreen /> },
+])
+```
+
+## User type
+
+The simplified user type used throughout the app:
+
+```tsx src/shared/types/auth.ts
+export interface User {
+  id: string
+  email: string
+  created_at: string
+}
+
+export interface AuthSession {
+  user: User
+  access_token: string
+}
+```
+
+<Note>
+  The app stores a minimal user object. Additional user data can be fetched from Supabase as needed.
+</Note>
+
+## Getting the current user in queries
+
+When making queries or mutations that need the current user ID, access it from Supabase:
+
+```tsx src/features/goals/api/use-comments.ts
+export function useAddComment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ goalId, body, guestLabel }: {
+      goalId: string
+      body: string
+      guestLabel?: string
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error } = await supabase
+        .from('goalst_comments')
+        .insert({
+          goal_id: goalId,
+          body,
+          user_id: user?.id ?? null,
+          guest_label: user ? null : (guestLabel ?? 'Guest'),
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ['comments', variables.goalId] })
+    },
+  })
+}
+```
+
+## Session persistence
+
+Supabase automatically handles session persistence:
+
+- Sessions are stored in `localStorage`
+- Sessions automatically refresh when they expire
+- The `onAuthStateChange` listener keeps the app in sync
+
+## Security best practices
+
+<Warning>
+  Never expose your Supabase service role key. Only use the anon key in client-side code.
+</Warning>
+
+<CardGroup cols={2}>
+  <Card>
+    **Row Level Security (RLS)**: Supabase enforces RLS policies on all database tables to ensure users can only access their own data.
+  </Card>
+  <Card>
+    **JWT tokens**: Authentication uses JWT tokens that are automatically included in Supabase requests.
+  </Card>
+  <Card>
+    **Password requirements**: Configure password strength requirements in your Supabase project settings.
+  </Card>
+  <Card>
+    **Email verification**: Enable email confirmation in Supabase to verify user email addresses.
+  </Card>
+</CardGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Introduction" icon="book" href="/api/introduction">
+    Learn about the overall architecture
+  </Card>
+  <Card title="Data Models" icon="database" href="/api/models/goal">
+    Explore the data models and types
+  </Card>
+</CardGroup>

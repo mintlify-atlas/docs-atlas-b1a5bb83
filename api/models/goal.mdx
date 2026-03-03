@@ -1,0 +1,151 @@
+---
+title: Goal
+description: The Goal data model represents a user's goal or objective
+---
+
+The `Goal` interface represents a user's goal or objective in the Goalst system. Goals can have sub-goals, collaborators, and support recurring patterns.
+
+## Properties
+
+<ResponseField name="id" type="string" required>
+  Unique identifier for the goal
+</ResponseField>
+
+<ResponseField name="user_id" type="string" required>
+  ID of the user who owns this goal
+</ResponseField>
+
+<ResponseField name="parent_goal_id" type="string | null" required>
+  ID of the parent goal if this is a sub-goal, or `null` if this is a top-level goal
+</ResponseField>
+
+<ResponseField name="title" type="string" required>
+  The goal's title
+</ResponseField>
+
+<ResponseField name="description" type="string | null" required>
+  Optional description providing details about the goal
+</ResponseField>
+
+<ResponseField name="start_date" type="string | null" required>
+  ISO 8601 date string for when the goal starts, or `null` if not set
+</ResponseField>
+
+<ResponseField name="end_date" type="string | null" required>
+  ISO 8601 date string for when the goal is due, or `null` if not set
+</ResponseField>
+
+<ResponseField name="status" type="GoalStatus" required>
+  Current status of the goal. Can be one of the predefined values or a custom user-defined status.
+  
+  **Enum values:**
+  - `not_started` - Goal has not been started
+  - `in_progress` - Goal is currently being worked on
+  - `completed` - Goal has been completed
+  - `abandoned` - Goal has been abandoned
+  - Custom string values are also supported
+</ResponseField>
+
+<ResponseField name="manual_progress" type="number | null" required>
+  Manually set progress percentage (0-100), or `null` to use computed progress from sub-goals
+</ResponseField>
+
+<ResponseField name="color_tag" type="string | null" required>
+  Optional color tag for visual categorization
+</ResponseField>
+
+<ResponseField name="is_recurring" type="boolean" required>
+  Whether this goal recurs on a regular schedule
+</ResponseField>
+
+<ResponseField name="recurrence_cadence" type="RecurrenceCadence | null" required>
+  How often the goal recurs, or `null` if not recurring.
+  
+  **Enum values:**
+  - `daily` - Recurs daily
+  - `weekly` - Recurs weekly
+</ResponseField>
+
+<ResponseField name="priority" type="number" required>
+  Priority level for the goal (higher numbers indicate higher priority)
+</ResponseField>
+
+<ResponseField name="created_at" type="string" required>
+  ISO 8601 timestamp when the goal was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string" required>
+  ISO 8601 timestamp when the goal was last updated
+</ResponseField>
+
+<ResponseField name="sub_goals" type="Goal[]">
+  Array of child goals (computed/joined field)
+</ResponseField>
+
+<ResponseField name="progress" type="number">
+  Computed progress percentage based on sub-goals completion (computed/joined field)
+</ResponseField>
+
+<ResponseField name="collaborators" type="Collaborator[]">
+  Array of collaborators with access to this goal (computed/joined field)
+</ResponseField>
+
+## Example
+
+```json
+{
+  "id": "goal_123",
+  "user_id": "user_456",
+  "parent_goal_id": null,
+  "title": "Launch new product",
+  "description": "Complete all tasks required to launch v2.0",
+  "start_date": "2026-01-01T00:00:00Z",
+  "end_date": "2026-12-31T23:59:59Z",
+  "status": "in_progress",
+  "manual_progress": null,
+  "color_tag": "#FF5733",
+  "is_recurring": false,
+  "recurrence_cadence": null,
+  "priority": 5,
+  "created_at": "2026-01-01T10:00:00Z",
+  "updated_at": "2026-03-03T08:30:00Z",
+  "sub_goals": [],
+  "progress": 45,
+  "collaborators": []
+}
+```
+
+## Type definitions
+
+```typescript
+export type GoalStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'completed'
+  | 'abandoned'
+  | string // custom user-defined statuses
+
+export type RecurrenceCadence = 'daily' | 'weekly'
+
+export interface Goal {
+  id: string
+  user_id: string
+  parent_goal_id: string | null
+  title: string
+  description: string | null
+  start_date: string | null
+  end_date: string | null
+  status: GoalStatus
+  manual_progress: number | null
+  color_tag: string | null
+  is_recurring: boolean
+  recurrence_cadence: RecurrenceCadence | null
+  priority: number
+  created_at: string
+  updated_at: string
+  // computed / joined
+  sub_goals?: Goal[]
+  progress?: number
+  collaborators?: Collaborator[]
+}
+```

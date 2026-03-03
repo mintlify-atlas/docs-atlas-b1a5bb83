@@ -1,0 +1,194 @@
+---
+title: Scoring hooks
+description: React hooks for user scoring and ranking
+---
+
+React hooks for fetching user scores and calculating rank information based on completed goals.
+
+## useUserScore
+
+Fetch the current user's score and ranking information.
+
+```typescript
+const { data, isLoading, error } = useUserScore()
+```
+
+### Returns
+
+<ParamField path="data" type="UserScore | null">
+  The user's score data, or `null` if the user is not authenticated
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed
+</ParamField>
+
+### UserScore type
+
+The `UserScore` object contains:
+
+<ParamField path="user_id" type="string">
+  The ID of the user
+</ParamField>
+
+<ParamField path="total_score" type="number">
+  The user's total score from completed goals
+</ParamField>
+
+<ParamField path="goals_completed" type="number">
+  The number of goals the user has completed
+</ParamField>
+
+<ParamField path="goals_total" type="number">
+  The total number of goals the user has created
+</ParamField>
+
+### Example
+
+```typescript
+import { useUserScore } from '@features/goals/api/use-score'
+import { getRankInfo } from '@features/goals/api/use-score'
+
+function UserScoreCard() {
+  const { data: userScore, isLoading } = useUserScore()
+  
+  if (isLoading) return <div>Loading...</div>
+  if (!userScore) return null
+  
+  const rank = getRankInfo(userScore.total_score)
+  
+  return (
+    <div>
+      <h2>Your Score</h2>
+      <p>Total Score: {userScore.total_score}</p>
+      <p>Goals Completed: {userScore.goals_completed} / {userScore.goals_total}</p>
+      <p>Rank: {rank.rank_emoji} {rank.rank_name}</p>
+      {rank.next_threshold && (
+        <p>
+          Next Rank: {rank.next_rank_name} at {rank.next_threshold} points
+        </p>
+      )}
+    </div>
+  )
+}
+```
+
+## getRankInfo
+
+Utility function to calculate rank information based on a score.
+
+```typescript
+const rankInfo = getRankInfo(score)
+```
+
+### Parameters
+
+<ParamField path="score" type="number" required>
+  The score to calculate rank information for
+</ParamField>
+
+### Returns
+
+<ParamField path="rank_name" type="string">
+  The name of the current rank (e.g., `'Rookie'`, `'Hustler'`, `'Champion'`)
+</ParamField>
+
+<ParamField path="rank_emoji" type="string">
+  The emoji representing the current rank
+</ParamField>
+
+<ParamField path="next_threshold" type="number | null">
+  The score needed to reach the next rank, or `null` if at max rank
+</ParamField>
+
+<ParamField path="next_rank_name" type="string | null">
+  The name of the next rank, or `null` if at max rank
+</ParamField>
+
+### Example
+
+```typescript
+import { getRankInfo } from '@features/goals/api/use-score'
+
+function calculateProgress(score: number) {
+  const rank = getRankInfo(score)
+  
+  if (!rank.next_threshold) {
+    return 100 // Max rank achieved
+  }
+  
+  // Find the minimum score for the current rank
+  const currentRankData = RANKS.find(r => r.rank_name === rank.rank_name)
+  const currentMin = currentRankData?.min_score ?? 0
+  
+  const progress = ((score - currentMin) / (rank.next_threshold - currentMin)) * 100
+  return Math.min(progress, 100)
+}
+
+function RankProgress({ score }: { score: number }) {
+  const rank = getRankInfo(score)
+  const progress = calculateProgress(score)
+  
+  return (
+    <div>
+      <h3>{rank.rank_emoji} {rank.rank_name}</h3>
+      {rank.next_threshold && (
+        <>
+          <div className="progress-bar">
+            <div className="progress" style={{ width: `${progress}%` }} />
+          </div>
+          <p>
+            {score} / {rank.next_threshold} to {rank.next_rank_name}
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+```
+
+## RANKS
+
+Constant array containing all rank definitions.
+
+```typescript
+export const RANKS: Array<RankInfo & { min_score: number }>
+```
+
+### Rank tiers
+
+The ranking system includes the following tiers:
+
+| Rank | Emoji | Min Score | Next Threshold |
+|------|-------|-----------|----------------|
+| Rookie | 🌱 | 0 | 50 |
+| Hustler | ⚡ | 50 | 150 |
+| Achiever | 🎯 | 150 | 350 |
+| Go-Getter | 🔥 | 350 | 700 |
+| Champion | 🏆 | 700 | 1500 |
+| Legend | 👑 | 1500 | - |
+
+### Example
+
+```typescript
+import { RANKS } from '@features/goals/api/use-score'
+
+function RanksList() {
+  return (
+    <div>
+      <h2>All Ranks</h2>
+      <ul>
+        {RANKS.map((rank) => (
+          <li key={rank.rank_name}>
+            {rank.rank_emoji} {rank.rank_name} - {rank.min_score}+ points
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+```

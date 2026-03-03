@@ -1,0 +1,236 @@
+---
+title: Share links hooks
+description: React hooks for managing goal share links
+---
+
+React hooks for creating and managing shareable links for goals, allowing public or permission-based access.
+
+## useShareLinks
+
+Fetch all active share links for a goal.
+
+```typescript
+const { data, isLoading, error } = useShareLinks(goalId)
+```
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal to fetch share links for
+</ParamField>
+
+### Returns
+
+<ParamField path="data" type="ShareLink[]">
+  Array of active (non-revoked) share links for the goal
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed
+</ParamField>
+
+### Example
+
+```typescript
+import { useShareLinks } from '@features/goals/api/use-share-links'
+
+function ShareLinksList({ goalId }: { goalId: string }) {
+  const { data: shareLinks, isLoading } = useShareLinks(goalId)
+  
+  if (isLoading) return <div>Loading...</div>
+  
+  return (
+    <ul>
+      {shareLinks?.map((link) => (
+        <li key={link.id}>
+          Token: {link.token} - Permission: {link.permission}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## useCreateShareLink
+
+Create a new share link for a goal.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useCreateShareLink()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(params: CreateShareLinkParams) => void">
+  Function to create a share link
+</ParamField>
+
+<ParamField path="mutateAsync" type="(params: CreateShareLinkParams) => Promise<ShareLink>">
+  Async function to create a share link and await the result
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal to create a share link for
+</ParamField>
+
+<ParamField path="permission" type="SharePermission" required>
+  The permission level for the share link. Possible values: `'view'`, `'comment'`, `'edit'`
+</ParamField>
+
+### Example
+
+```typescript
+import { useCreateShareLink } from '@features/goals/api/use-share-links'
+
+function CreateShareLinkButton({ goalId }: { goalId: string }) {
+  const { mutate: createShareLink, isPending } = useCreateShareLink()
+  
+  const handleCreate = (permission: SharePermission) => {
+    createShareLink(
+      { goalId, permission },
+      {
+        onSuccess: (link) => {
+          const url = `${window.location.origin}/shared/${link.token}`
+          navigator.clipboard.writeText(url)
+          alert('Link copied to clipboard!')
+        },
+      }
+    )
+  }
+  
+  return (
+    <div>
+      <button onClick={() => handleCreate('view')} disabled={isPending}>
+        Create View Link
+      </button>
+      <button onClick={() => handleCreate('comment')} disabled={isPending}>
+        Create Comment Link
+      </button>
+      <button onClick={() => handleCreate('edit')} disabled={isPending}>
+        Create Edit Link
+      </button>
+    </div>
+  )
+}
+```
+
+## useRevokeShareLink
+
+Revoke an existing share link.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useRevokeShareLink()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(params: RevokeShareLinkParams) => void">
+  Function to revoke a share link
+</ParamField>
+
+<ParamField path="mutateAsync" type="(params: RevokeShareLinkParams) => Promise<string>">
+  Async function to revoke a share link and await completion. Returns the goal ID.
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="id" type="string" required>
+  The ID of the share link to revoke
+</ParamField>
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal (used for cache invalidation)
+</ParamField>
+
+### Example
+
+```typescript
+import { useRevokeShareLink } from '@features/goals/api/use-share-links'
+
+function RevokeShareLinkButton({
+  linkId,
+  goalId,
+}: {
+  linkId: string
+  goalId: string
+}) {
+  const { mutate: revokeLink, isPending } = useRevokeShareLink()
+  
+  const handleRevoke = () => {
+    if (confirm('Revoke this share link? It will no longer be accessible.')) {
+      revokeLink({ id: linkId, goalId })
+    }
+  }
+  
+  return (
+    <button onClick={handleRevoke} disabled={isPending}>
+      Revoke Link
+    </button>
+  )
+}
+```
+
+## useGoalByToken
+
+Fetch a goal using a share link token.
+
+```typescript
+const { data, isLoading, error } = useGoalByToken(token)
+```
+
+### Parameters
+
+<ParamField path="token" type="string" required>
+  The share link token to use for fetching the goal
+</ParamField>
+
+### Returns
+
+<ParamField path="data" type="ShareLink & { goal: Goal }">
+  The share link object with the associated goal data included
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed (e.g., invalid or revoked token)
+</ParamField>
+
+### Example
+
+```typescript
+import { useGoalByToken } from '@features/goals/api/use-share-links'
+import { useParams } from 'react-router-dom'
+
+function SharedGoalPage() {
+  const { token } = useParams<{ token: string }>()
+  const { data, isLoading, error } = useGoalByToken(token!)
+  
+  if (isLoading) return <div>Loading...</div>
+  if (error) return <div>Invalid or expired share link</div>
+  
+  return (
+    <div>
+      <h1>{data?.goal.title}</h1>
+      <p>Permission: {data?.permission}</p>
+      <p>{data?.goal.description}</p>
+    </div>
+  )
+}
+```

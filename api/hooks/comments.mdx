@@ -1,0 +1,173 @@
+---
+title: Comments hooks
+description: React hooks for managing goal comments
+---
+
+React hooks for fetching and adding comments on goals, with support for authenticated users and guest comments.
+
+## useComments
+
+Fetch all comments for a goal.
+
+```typescript
+const { data, isLoading, error } = useComments(goalId)
+```
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal to fetch comments for
+</ParamField>
+
+### Returns
+
+<ParamField path="data" type="Comment[]">
+  Array of comments with user information, ordered by creation date (oldest first)
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed
+</ParamField>
+
+### Example
+
+```typescript
+import { useComments } from '@features/goals/api/use-comments'
+
+function CommentsList({ goalId }: { goalId: string }) {
+  const { data: comments, isLoading } = useComments(goalId)
+  
+  if (isLoading) return <div>Loading comments...</div>
+  
+  return (
+    <div>
+      {comments?.map((comment) => (
+        <div key={comment.id}>
+          <strong>
+            {comment.user?.email || comment.guest_label}
+          </strong>
+          <p>{comment.body}</p>
+          <small>{new Date(comment.created_at).toLocaleString()}</small>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+## useAddComment
+
+Add a new comment to a goal.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useAddComment()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(params: AddCommentParams) => void">
+  Function to add a comment
+</ParamField>
+
+<ParamField path="mutateAsync" type="(params: AddCommentParams) => Promise<Comment>">
+  Async function to add a comment and await the result
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal to add the comment to
+</ParamField>
+
+<ParamField path="body" type="string" required>
+  The text content of the comment
+</ParamField>
+
+<ParamField path="guestLabel" type="string">
+  The display name for guest users. Defaults to `'Guest'`. Only used when the user is not authenticated.
+</ParamField>
+
+### Example
+
+```typescript
+import { useAddComment } from '@features/goals/api/use-comments'
+import { useState } from 'react'
+
+function AddCommentForm({ goalId }: { goalId: string }) {
+  const [body, setBody] = useState('')
+  const { mutate: addComment, isPending } = useAddComment()
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    addComment(
+      { goalId, body },
+      {
+        onSuccess: () => {
+          setBody('')
+        },
+      }
+    )
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="Add a comment..."
+        required
+      />
+      <button disabled={isPending}>Post Comment</button>
+    </form>
+  )
+}
+```
+
+### Guest comments
+
+When a user is not authenticated, comments are saved with a `guest_label` instead of a user ID:
+
+```typescript
+import { useAddComment } from '@features/goals/api/use-comments'
+import { useState } from 'react'
+
+function GuestCommentForm({ goalId }: { goalId: string }) {
+  const [body, setBody] = useState('')
+  const [name, setName] = useState('')
+  const { mutate: addComment, isPending } = useAddComment()
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    addComment({
+      goalId,
+      body,
+      guestLabel: name || 'Anonymous',
+    })
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Your name (optional)"
+      />
+      <textarea
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        placeholder="Add a comment..."
+        required
+      />
+      <button disabled={isPending}>Post Comment</button>
+    </form>
+  )
+}
+```

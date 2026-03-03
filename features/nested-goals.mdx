@@ -1,0 +1,241 @@
+---
+title: Building goal hierarchies
+description: Break down complex goals into manageable sub-goals and track nested progress
+---
+
+Goalst supports unlimited nesting of sub-goals, allowing you to break down large, complex objectives into smaller, actionable tasks. Progress automatically rolls up from child goals to parents.
+
+## Why use sub-goals
+
+Sub-goals help you:
+
+- **Break down complexity** - Turn overwhelming goals into manageable steps
+- **Track dependencies** - Organize goals that must happen in sequence
+- **Automatic progress** - Parent goals calculate progress from their children
+- **Hierarchical scoring** - Each level contributes to your total score
+
+<Note>
+  Progress for a parent goal is automatically calculated as the average completion of all its sub-goals. You can nest goals as deeply as needed.
+</Note>
+
+## Creating sub-goals
+
+<Steps>
+  <Step title="Open a parent goal">
+    Navigate to any goal's detail page by clicking on it from your dashboard.
+  </Step>
+  
+  <Step title="Add a sub-goal">
+    In the sub-goals section, click "Add sub-goal" to create a child goal.
+  </Step>
+  
+  <Step title="Enter details">
+    Provide a title and set the priority level (1-20). Sub-goals inherit context from their parent but can have their own priority.
+    
+    ```typescript
+    interface Goal {
+      id: string
+      parent_goal_id: string | null  // Links to parent
+      title: string
+      priority: number
+      sub_goals?: Goal[]  // Recursive children
+    }
+    ```
+  </Step>
+  
+  <Step title="Nest further">
+    Each sub-goal can have its own sub-goals. Click on any sub-goal to expand it and add nested children.
+  </Step>
+</Steps>
+
+## Sub-goal tree view
+
+The sub-goal tree displays all nested goals in an expandable/collapsible hierarchy:
+
+```typescript
+interface SubGoalTreeProps {
+  parentId: string
+  depth?: number        // Current nesting level
+  canEdit: boolean      // Permission check
+}
+```
+
+Each row in the tree shows:
+
+- **Expand/collapse toggle** - Chevron icon to show/hide children
+- **Completion checkbox** - Click to toggle between in progress and completed
+- **Title** - Double-click to edit inline
+- **Progress percentage** - Calculated from children or manual
+- **Priority indicator** - Lightning bolt icon with priority value
+- **Delete button** - Remove the sub-goal (only visible on hover)
+
+<Warning>
+  Deleting a sub-goal also deletes all of its nested children. You'll see a confirmation prompt showing how many sub-goals will be affected.
+</Warning>
+
+## Automatic progress calculation
+
+Parent goals automatically calculate their progress based on sub-goal completion:
+
+```typescript
+export function computeProgress(goal: Goal): number {
+  // If no sub-goals, use manual progress
+  if (!goal.sub_goals || goal.sub_goals.length === 0) {
+    return goal.manual_progress ?? 0
+  }
+
+  // Recursively compute weighted average
+  const total = goal.sub_goals.length
+  const completedWeight = goal.sub_goals.reduce((sum, sub) => {
+    const subProgress = computeProgress(sub)  // Recursive
+    return sum + subProgress / 100
+  }, 0)
+
+  return Math.round((completedWeight / total) * 100)
+}
+```
+
+### How it works
+
+1. Goals without sub-goals use their `manual_progress` value (0-100)
+2. Goals with sub-goals calculate progress as the average of all children
+3. Calculation is recursive, so deeply nested structures work correctly
+4. A goal reaches 100% when all descendants are at 100%
+
+<Note>
+  If a goal has sub-goals, its manual progress is ignored. Progress comes entirely from the sub-goal tree.
+</Note>
+
+## Example hierarchy
+
+Here's how a typical goal hierarchy might look:
+
+<CodeGroup>
+```typescript Structure
+{
+  title: "Launch SaaS Product",
+  progress: 45,  // Auto-calculated
+  sub_goals: [
+    {
+      title: "Build MVP",
+      progress: 80,  // Auto-calculated
+      sub_goals: [
+        { title: "Design UI", progress: 100, manual_progress: 100 },
+        { title: "Implement Auth", progress: 100, manual_progress: 100 },
+        { title: "Add Payments", progress: 40, manual_progress: 40 }
+      ]
+    },
+    {
+      title: "Marketing",
+      progress: 10,  // Auto-calculated
+      sub_goals: [
+        { title: "Create Landing Page", progress: 100, manual_progress: 100 },
+        { title: "Write Blog Posts", progress: 0, manual_progress: 0 },
+        { title: "Social Media Campaign", progress: 0, manual_progress: 0 }
+      ]
+    }
+  ]
+}
+```
+
+```sql Query
+-- Fetch a goal with all nested sub-goals
+SELECT *
+FROM goalst_goals
+WHERE parent_goal_id = 'parent-id'
+ORDER BY created_at ASC;
+```
+</CodeGroup>
+
+## Editing sub-goals
+
+You can edit sub-goals directly in the tree view:
+
+<CardGroup cols={2}>
+  <Card title="Edit title" icon="pencil">
+    Double-click on any sub-goal title to edit it inline. Press Enter to save or Escape to cancel.
+  </Card>
+  
+  <Card title="Change priority" icon="bolt">
+    Click the lightning bolt icon to edit priority. Enter a new value (1-20) and press Enter.
+  </Card>
+  
+  <Card title="Toggle completion" icon="check-circle">
+    Click the checkbox to mark complete or incomplete. Completed sub-goals show with a strikethrough.
+  </Card>
+  
+  <Card title="Delete sub-goal" icon="trash">
+    Hover over a row and click the trash icon. Confirm the deletion to remove it and all children.
+  </Card>
+</CardGroup>
+
+## Priority inheritance and scoring
+
+Each goal in the hierarchy has its own priority that contributes to scoring:
+
+```typescript
+export function getEffectivePriority(goal: Goal): number {
+  const childrenSum =
+    goal.sub_goals?.reduce((sum, child) => sum + getEffectivePriority(child), 0) ?? 0
+  return goal.priority + childrenSum
+}
+```
+
+- A parent goal's **effective priority** is its own priority plus all descendant priorities
+- When you complete a goal, you earn points equal to its individual priority (not effective)
+- Sub-goals can have different priorities than their parents
+- Higher priority = more points when completed
+
+<Note>
+  Breaking a priority-10 goal into 10 priority-1 sub-goals gives you the same total points, but lets you earn progress incrementally.
+</Note>
+
+## Permissions
+
+Sub-goal editing respects collaboration permissions:
+
+- **Owners and Editors** can create, edit, and delete sub-goals
+- **Viewers** can see the tree but cannot make changes
+- **Share link visitors** follow the link's permission (view or edit)
+
+```typescript
+interface SubGoalTreeProps {
+  canEdit: boolean  // Passed down from parent permission check
+}
+```
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Keep levels focused" icon="layer-group">
+    Each level should represent a clear breakdown. Don't nest unnecessarily deep.
+  </Card>
+  
+  <Card title="Balance priority distribution" icon="balance-scale">
+    Distribute priority across sub-goals based on importance and effort.
+  </Card>
+  
+  <Card title="Use descriptive titles" icon="tag">
+    Sub-goal titles should clearly indicate what needs to be done.
+  </Card>
+  
+  <Card title="Review regularly" icon="clock">
+    Check your goal trees weekly to update progress and adjust priorities.
+  </Card>
+</CardGroup>
+
+## Related features
+
+<CardGroup cols={2}>
+  <Card title="Goals" icon="target" href="/features/goals">
+    Learn about creating and managing individual goals
+  </Card>
+  
+  <Card title="Progress tracking" icon="chart-line" href="/features/progress-tracking">
+    Understand how progress calculations work
+  </Card>
+  
+  <Card title="Gamification" icon="trophy" href="/features/gamification">
+    See how nested goals affect your score
+  </Card>
+</CardGroup>

@@ -1,0 +1,176 @@
+---
+title: Creating and managing goals
+description: Learn how to create, update, and organize your goals in Goalst
+---
+
+Goals are the foundation of Goalst. Each goal represents something you want to achieve, with full support for descriptions, deadlines, priorities, and progress tracking.
+
+## Creating a goal
+
+You can create a new goal from your dashboard by clicking the "New Goal" button.
+
+<Steps>
+  <Step title="Open the create goal modal">
+    Click the "New Goal" button on your dashboard to open the goal creation form.
+  </Step>
+  
+  <Step title="Enter basic information">
+    Provide a title (required) and optional description for your goal.
+    
+    ```typescript
+    interface Goal {
+      title: string
+      description: string | null
+      // ... other fields
+    }
+    ```
+  </Step>
+  
+  <Step title="Set dates and deadlines">
+    Choose a start date (defaults to today) and an optional end date. The end date creates a deadline that affects urgency indicators throughout the app.
+  </Step>
+  
+  <Step title="Choose a color tag">
+    Select a color to visually categorize your goal. Available colors include:
+    - Forest green (`#166534`)
+    - Sky blue (`#0284c7`)
+    - Amber (`#d97706`)
+    - Rose (`#e11d48`)
+    - Purple (`#7c3aed`)
+  </Step>
+  
+  <Step title="Set priority level">
+    Use the priority slider to set a value between 1-20. Higher priority goals contribute more points to your score when completed.
+    
+    <Note>
+      Priority directly affects your achievement score. A goal with priority 10 will earn you more points than a goal with priority 1.
+    </Note>
+  </Step>
+  
+  <Step title="Create the goal">
+    Click "Create goal" to save. Your new goal will appear on your dashboard with a "Not started" status.
+  </Step>
+</Steps>
+
+## Goal statuses
+
+Every goal has a status that tracks its lifecycle:
+
+<CardGroup cols={2}>
+  <Card title="Not started" icon="circle">
+    Initial state for new goals that haven't begun yet.
+  </Card>
+  
+  <Card title="In progress" icon="spinner">
+    Active goals you're currently working on.
+  </Card>
+  
+  <Card title="Completed" icon="check">
+    Goals you've successfully finished. Completed goals contribute to your score.
+  </Card>
+  
+  <Card title="Abandoned" icon="x">
+    Goals you've decided not to pursue. These don't count toward your score.
+  </Card>
+</CardGroup>
+
+```typescript
+type GoalStatus = 'not_started' | 'in_progress' | 'completed' | 'abandoned' | string
+```
+
+<Note>
+  You can also define custom status values beyond the four built-in options.
+</Note>
+
+## Viewing your goals
+
+Your dashboard displays all top-level goals (goals without a parent) sorted by end date. Each goal card shows:
+
+- **Title and description** - What you're working toward
+- **Status badge** - Current state (color-coded)
+- **Deadline badge** - Time remaining with urgency indicator
+- **Progress bar** - Completion percentage
+- **Color tag stripe** - Visual category indicator at the top
+- **Collaborator count** - Number of team members on the goal
+
+### Urgency indicators
+
+Goals with deadlines show urgency through color-coded badges and a left border accent:
+
+- **Normal** - More than 20% of time remaining
+- **Warning** (yellow) - 10-20% of time remaining
+- **Critical** (red) - Less than 10% of time remaining or 2 days left
+- **Overdue** (dark red) - Past the end date
+
+```typescript
+export function formatDeadline(endDate: string, startDate?: string | null): DeadlineInfo {
+  const now = new Date()
+  const end = new Date(endDate)
+  const diffDays = Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays < 0) {
+    return { label: `Overdue by ${Math.abs(diffDays)}d`, urgency: 'overdue' }
+  }
+  if (diffDays === 0) {
+    return { label: 'Due today', urgency: 'critical' }
+  }
+  // ...
+}
+```
+
+## Updating goals
+
+You can edit any goal field after creation:
+
+1. Click on a goal card to open the detail view
+2. Update the title, description, dates, status, or priority
+3. Changes save automatically
+
+<Warning>
+  Changing a goal's status to "completed" immediately updates your score and triggers achievement rank calculations.
+</Warning>
+
+## Manual progress tracking
+
+For goals without sub-goals, you can manually set progress from 0-100%:
+
+```typescript
+interface Goal {
+  manual_progress: number | null  // 0-100 percentage
+  // ...
+}
+```
+
+When you mark a goal as completed, the manual progress automatically sets to 100.
+
+## Deleting goals
+
+You can delete a goal from its detail page. Deleting a goal will:
+
+- Permanently remove the goal and all its sub-goals
+- Remove any associated share links and collaborators
+- Recalculate your score if the goal was completed
+
+<Warning>
+  Deletion is permanent and cannot be undone. Make sure you want to delete before confirming.
+</Warning>
+
+## Related features
+
+<CardGroup cols={2}>
+  <Card title="Nested goals" icon="sitemap" href="/features/nested-goals">
+    Break down large goals into manageable sub-goals
+  </Card>
+  
+  <Card title="Progress tracking" icon="chart-line" href="/features/progress-tracking">
+    Monitor completion and calculate automatic progress
+  </Card>
+  
+  <Card title="Templates" icon="clone" href="/features/templates">
+    Save goal structures for reuse
+  </Card>
+  
+  <Card title="Gamification" icon="trophy" href="/features/gamification">
+    Earn points and ranks by completing goals
+  </Card>
+</CardGroup>

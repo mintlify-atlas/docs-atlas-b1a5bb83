@@ -1,0 +1,354 @@
+---
+title: Tracking progress and metrics
+description: Monitor goal completion with automatic and manual progress tracking
+---
+
+Goalst provides flexible progress tracking that works for both simple goals and complex hierarchies. Progress can be tracked manually or calculated automatically based on sub-goal completion.
+
+## Progress calculation modes
+
+Goalst uses two different methods to track progress depending on your goal structure:
+
+<CardGroup cols={2}>
+  <Card title="Manual progress" icon="sliders">
+    For goals **without sub-goals**  
+    Set a 0-100% value manually  
+    Full control over progress updates
+  </Card>
+  
+  <Card title="Automatic progress" icon="calculator">
+    For goals **with sub-goals**  
+    Calculated as average of children  
+    Updates automatically when sub-goals change
+  </Card>
+</CardGroup>
+
+```typescript
+export function computeProgress(goal: Goal): number {
+  // Mode 1: No sub-goals → use manual progress
+  if (!goal.sub_goals || goal.sub_goals.length === 0) {
+    return goal.manual_progress ?? 0
+  }
+
+  // Mode 2: Has sub-goals → calculate average
+  const total = goal.sub_goals.length
+  const completedWeight = goal.sub_goals.reduce((sum, sub) => {
+    const subProgress = computeProgress(sub)  // Recursive
+    return sum + subProgress / 100
+  }, 0)
+
+  return Math.round((completedWeight / total) * 100)
+}
+```
+
+<Note>
+  Once you add sub-goals to a goal, its manual progress is ignored. Remove all sub-goals to return to manual mode.
+</Note>
+
+## Manual progress tracking
+
+For simple goals without sub-goals, you control the progress value directly:
+
+### Setting progress
+
+1. Navigate to the goal's detail page
+2. Find the progress slider or input field
+3. Set a value between 0-100
+4. The progress bar updates immediately
+
+```typescript
+interface Goal {
+  manual_progress: number | null  // 0-100 percentage
+}
+
+const updateGoal = useUpdateGoal()
+await updateGoal.mutateAsync({
+  id: goalId,
+  manual_progress: 75  // 75% complete
+})
+```
+
+### When to use manual progress
+
+- **Continuous goals**: Workout for 30 days, read for 10 hours
+- **Measurable outcomes**: Lose 10 pounds, save $5000
+- **Single-step goals**: Submit application, schedule appointment
+- **Percentage-based**: Complete 80% of the course
+
+<Note>
+  Manual progress is perfect when you can't break the goal into discrete sub-tasks, or when the goal measures a continuous metric.
+</Note>
+
+## Automatic progress calculation
+
+When a goal has sub-goals, progress is calculated automatically:
+
+### How it works
+
+1. Each sub-goal has its own progress (manual or calculated)
+2. The parent's progress is the average of all sub-goals
+3. Calculation is recursive, so nested hierarchies work correctly
+4. A goal reaches 100% only when all descendants are at 100%
+
+### Example calculation
+
+```typescript
+// Goal hierarchy
+const goal = {
+  title: "Launch Product",
+  sub_goals: [
+    { title: "Build MVP", manual_progress: 80 },
+    { title: "Marketing", manual_progress: 60 },
+    { title: "Launch Plan", manual_progress: 40 }
+  ]
+}
+
+// Calculation
+// (80 + 60 + 40) / 3 = 60% average
+computeProgress(goal) // Returns 60
+```
+
+### Nested hierarchy example
+
+```typescript
+const goal = {
+  title: "Complete Project",
+  sub_goals: [
+    {
+      title: "Phase 1",
+      sub_goals: [
+        { title: "Task A", manual_progress: 100 },
+        { title: "Task B", manual_progress: 100 }
+      ]
+      // Phase 1 progress: (100 + 100) / 2 = 100%
+    },
+    {
+      title: "Phase 2",
+      sub_goals: [
+        { title: "Task C", manual_progress: 50 },
+        { title: "Task D", manual_progress: 0 }
+      ]
+      // Phase 2 progress: (50 + 0) / 2 = 25%
+    }
+  ]
+  // Total progress: (100 + 25) / 2 = 62.5% → 63% (rounded)
+}
+```
+
+## Progress visualization
+
+Progress is displayed throughout the app with consistent visual indicators:
+
+### Progress bars
+
+```tsx
+<ProgressBar value={progress} showLabel />
+```
+
+- **Green** (`bg-brand-600`): 100% complete
+- **Medium green** (`bg-brand-400`): 50-99% complete
+- **Light green** (`bg-brand-200`): 1-49% complete
+- **Gray** (`bg-brand-100`): 0% complete (background)
+
+### Sub-goal tree indicators
+
+Each sub-goal row shows:
+
+```tsx
+<span className="text-xs font-bold text-brand-400 w-8 text-right tabular-nums">
+  {progress}%
+</span>
+```
+
+- **Percentage label** - Shown on the right side of each row
+- **Mini progress bar** - Horizontal bar below the row
+- **Completion checkbox** - Check to mark 100% complete
+
+### Goal cards
+
+Dashboard cards display:
+
+- Full-width progress bar at the bottom
+- Percentage label (e.g., "63%") on the progress bar
+- Color-coded based on completion level
+
+## Marking goals complete
+
+When you mark a goal as "completed", several things happen:
+
+```typescript
+await updateGoal.mutateAsync({
+  id: goal.id,
+  status: 'completed',
+  manual_progress: 100  // Automatically set
+})
+```
+
+1. Status changes to "completed"
+2. Manual progress (if applicable) sets to 100
+3. Progress bar turns green
+4. Your score updates (you earn points)
+5. Parent goal progress recalculates
+
+<Note>
+  Marking a parent goal complete does NOT automatically complete its sub-goals. Each sub-goal must be completed individually.
+</Note>
+
+## Score calculation
+
+Completing goals contributes to your total score:
+
+```typescript
+interface UserScore {
+  user_id: string
+  total_score: number      // Sum of all completed goal priorities
+  goals_completed: number  // Count of completed goals
+  goals_total: number      // Count of all goals
+}
+```
+
+Each completed goal adds its **priority** value to your total score:
+
+- Complete a priority-1 goal → +1 point
+- Complete a priority-10 goal → +10 points
+- Complete a priority-20 goal → +20 points
+
+<Warning>
+  Only the goal owner earns score points. Collaborators who mark goals complete do not earn points.
+</Warning>
+
+## Progress insights
+
+The dashboard shows aggregate progress metrics:
+
+### Stats strip
+
+```tsx
+<StatsStrip>
+  <Stat label="Total goals" value={goals.length} />
+  <Stat label="Completed" value={completedCount} />
+  <Stat label="In progress" value={activeCount} />
+  <Stat label="Completion rate" value={`${completionRate}%`} />
+</StatsStrip>
+```
+
+These metrics help you understand your overall progress and productivity.
+
+## Real-time updates
+
+Progress updates propagate immediately:
+
+```typescript
+onSuccess: (_data, variables) => {
+  // Invalidate the specific goal
+  qc.invalidateQueries({ queryKey: ['goal', variables.id] })
+  
+  // Invalidate parent's sub-goal list
+  if (variables.parent_goal_id) {
+    qc.invalidateQueries({ queryKey: ['sub-goals', variables.parent_goal_id] })
+  }
+  
+  // Refresh dashboard
+  qc.invalidateQueries({ queryKey: GOALS_QUERY_KEY })
+  
+  // Update score if status changed
+  if (variables.status) {
+    qc.invalidateQueries({ queryKey: ['user-score'] })
+  }
+}
+```
+
+- Sub-goal changes update parent progress
+- Dashboard refreshes to show new values
+- Score recalculates when goals are completed
+- All views stay in sync
+
+## Progress tracking best practices
+
+<CardGroup cols={2}>
+  <Card title="Break down large goals" icon="scissors">
+    Instead of manually tracking a big goal, break it into sub-goals for automatic progress.
+  </Card>
+  
+  <Card title="Update regularly" icon="clock">
+    Keep manual progress current. Update weekly or after major milestones.
+  </Card>
+  
+  <Card title="Use realistic increments" icon="ruler">
+    Don't jump from 0% to 100%. Update progress incrementally as work completes.
+  </Card>
+  
+  <Card title="Review parent progress" icon="eye">
+    Check that calculated progress matches your intuition. Adjust sub-goal breakdown if needed.
+  </Card>
+</CardGroup>
+
+## Effective priority and scoring
+
+For nested goals, the **effective priority** includes all descendants:
+
+```typescript
+export function getEffectivePriority(goal: Goal): number {
+  const childrenSum =
+    goal.sub_goals?.reduce((sum, child) => sum + getEffectivePriority(child), 0) ?? 0
+  return goal.priority + childrenSum
+}
+```
+
+Example:
+
+```typescript
+const goal = {
+  title: "Launch Product",
+  priority: 10,
+  sub_goals: [
+    { title: "Build MVP", priority: 5 },
+    { title: "Marketing", priority: 3 },
+    { title: "Launch Plan", priority: 2 }
+  ]
+}
+
+// Own priority: 10
+// Children sum: 5 + 3 + 2 = 10
+// Effective priority: 10 + 10 = 20
+getEffectivePriority(goal) // Returns 20
+```
+
+<Note>
+  Effective priority shows the total potential score from completing a goal and all its sub-goals. Use it to prioritize which goals to work on.
+</Note>
+
+## Troubleshooting progress
+
+### Progress stuck at 0%
+
+- Check that manual progress is set (for leaf goals)
+- Verify sub-goals have progress values (for parent goals)
+
+### Progress not updating
+
+- Refresh the page to pull latest data
+- Check that sub-goals are properly linked (have correct `parent_goal_id`)
+- Ensure you have edit permissions
+
+### Progress calculation seems wrong
+
+- Remember that progress is an average, not a sum
+- Check nested sub-goals - they affect parent calculation recursively
+- Use the browser console to inspect the goal structure
+
+## Related features
+
+<CardGroup cols={2}>
+  <Card title="Goals" icon="target" href="/features/goals">
+    Learn about creating and managing goals
+  </Card>
+  
+  <Card title="Nested goals" icon="sitemap" href="/features/nested-goals">
+    Understand goal hierarchies and sub-goals
+  </Card>
+  
+  <Card title="Gamification" icon="trophy" href="/features/gamification">
+    See how progress affects your score and rank
+  </Card>
+</CardGroup>

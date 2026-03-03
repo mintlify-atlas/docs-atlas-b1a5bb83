@@ -1,0 +1,255 @@
+---
+title: Collaborators hooks
+description: React hooks for managing goal collaborators
+---
+
+React hooks for managing collaborators on goals, including adding, updating roles, and removing collaborators.
+
+## useCollaborators
+
+Fetch all collaborators for a goal.
+
+```typescript
+const { data, isLoading, error } = useCollaborators(goalId)
+```
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal to fetch collaborators for
+</ParamField>
+
+### Returns
+
+<ParamField path="data" type="Collaborator[]">
+  Array of collaborators with user information included
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed
+</ParamField>
+
+### Example
+
+```typescript
+import { useCollaborators } from '@features/goals/api/use-collaborators'
+
+function CollaboratorsList({ goalId }: { goalId: string }) {
+  const { data: collaborators, isLoading } = useCollaborators(goalId)
+  
+  if (isLoading) return <div>Loading...</div>
+  
+  return (
+    <ul>
+      {collaborators?.map((collab) => (
+        <li key={collab.user_id}>
+          {collab.user.email} - {collab.role}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## useAddCollaborator
+
+Add a new collaborator to a goal by email.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useAddCollaborator()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(params: AddCollaboratorParams) => void">
+  Function to add a collaborator
+</ParamField>
+
+<ParamField path="mutateAsync" type="(params: AddCollaboratorParams) => Promise<Collaborator>">
+  Async function to add a collaborator and await the result
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal to add the collaborator to
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  The email address of the user to add as a collaborator
+</ParamField>
+
+<ParamField path="role" type="CollaboratorRole" required>
+  The role to assign to the collaborator. Possible values: `'viewer'`, `'editor'`, `'admin'`
+</ParamField>
+
+### Example
+
+```typescript
+import { useAddCollaborator } from '@features/goals/api/use-collaborators'
+
+function AddCollaboratorForm({ goalId }: { goalId: string }) {
+  const { mutate: addCollaborator, isPending } = useAddCollaborator()
+  
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    
+    addCollaborator({
+      goalId,
+      email: formData.get('email') as string,
+      role: formData.get('role') as CollaboratorRole,
+    })
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="email" type="email" required />
+      <select name="role" required>
+        <option value="viewer">Viewer</option>
+        <option value="editor">Editor</option>
+        <option value="admin">Admin</option>
+      </select>
+      <button disabled={isPending}>Add Collaborator</button>
+    </form>
+  )
+}
+```
+
+## useUpdateCollaboratorRole
+
+Update the role of an existing collaborator.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useUpdateCollaboratorRole()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(params: UpdateRoleParams) => void">
+  Function to update a collaborator's role
+</ParamField>
+
+<ParamField path="mutateAsync" type="(params: UpdateRoleParams) => Promise<void>">
+  Async function to update a collaborator's role and await completion
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal
+</ParamField>
+
+<ParamField path="userId" type="string" required>
+  The ID of the user whose role to update
+</ParamField>
+
+<ParamField path="role" type="CollaboratorRole" required>
+  The new role to assign. Possible values: `'viewer'`, `'editor'`, `'admin'`
+</ParamField>
+
+### Example
+
+```typescript
+import { useUpdateCollaboratorRole } from '@features/goals/api/use-collaborators'
+
+function CollaboratorRoleSelect({
+  goalId,
+  userId,
+  currentRole,
+}: {
+  goalId: string
+  userId: string
+  currentRole: string
+}) {
+  const { mutate: updateRole } = useUpdateCollaboratorRole()
+  
+  const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    updateRole({
+      goalId,
+      userId,
+      role: e.target.value as CollaboratorRole,
+    })
+  }
+  
+  return (
+    <select value={currentRole} onChange={handleChange}>
+      <option value="viewer">Viewer</option>
+      <option value="editor">Editor</option>
+      <option value="admin">Admin</option>
+    </select>
+  )
+}
+```
+
+## useRemoveCollaborator
+
+Remove a collaborator from a goal.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useRemoveCollaborator()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(params: RemoveCollaboratorParams) => void">
+  Function to remove a collaborator
+</ParamField>
+
+<ParamField path="mutateAsync" type="(params: RemoveCollaboratorParams) => Promise<void>">
+  Async function to remove a collaborator and await completion
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="goalId" type="string" required>
+  The ID of the goal
+</ParamField>
+
+<ParamField path="userId" type="string" required>
+  The ID of the user to remove as a collaborator
+</ParamField>
+
+### Example
+
+```typescript
+import { useRemoveCollaborator } from '@features/goals/api/use-collaborators'
+
+function RemoveCollaboratorButton({
+  goalId,
+  userId,
+}: {
+  goalId: string
+  userId: string
+}) {
+  const { mutate: removeCollaborator, isPending } = useRemoveCollaborator()
+  
+  const handleRemove = () => {
+    if (confirm('Remove this collaborator?')) {
+      removeCollaborator({ goalId, userId })
+    }
+  }
+  
+  return (
+    <button onClick={handleRemove} disabled={isPending}>
+      Remove
+    </button>
+  )
+}
+```

@@ -1,0 +1,356 @@
+---
+title: Sharing goals via links
+description: Generate shareable links that give anyone view or edit access to your goals
+---
+
+Share links let you give access to goals without requiring recipients to have a Goalst account. Anyone with the link can view or edit the goal based on the permission level you set.
+
+## How share links work
+
+Each share link is a unique URL that grants access to a specific goal:
+
+```typescript
+interface ShareLink {
+  id: string
+  goal_id: string
+  token: string                    // Unique identifier in URL
+  permission: SharePermission       // 'view' | 'edit'
+  created_at: string
+  revoked_at: string | null        // Set when link is disabled
+}
+
+type SharePermission = 'view' | 'edit'
+```
+
+The token is a UUID with dashes removed, creating a secure, unguessable URL:
+
+```typescript
+const token = crypto.randomUUID().replace(/-/g, '')
+// Example: 'a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6'
+```
+
+<Note>
+  Share links are public URLs. Anyone who has the link can access the goal. Don't share links in public channels unless you want the goal to be public.
+</Note>
+
+## Creating share links
+
+<Steps>
+  <Step title="Open the share panel">
+    Navigate to a goal's detail page and find the "Share links" section.
+  </Step>
+  
+  <Step title="Choose permission level">
+    Select either "View only" or "Can edit" from the dropdown:
+    
+    - **View only**: Recipients can see the goal, sub-goals, and comments but cannot make changes
+    - **Can edit**: Recipients can modify the goal, complete sub-goals, and add comments
+  </Step>
+  
+  <Step title="Generate the link">
+    Click "Generate link" to create a new share link. The URL appears immediately.
+    
+    ```typescript
+    export function useCreateShareLink() {
+      return useMutation({
+        mutationFn: async ({
+          goalId,
+          permission,
+        }: {
+          goalId: string
+          permission: SharePermission
+        }) => {
+          const token = crypto.randomUUID().replace(/-/g, '')
+          const { data, error } = await supabase
+            .from('goalst_share_links')
+            .insert({ goal_id: goalId, token, permission })
+            .select()
+            .single()
+          if (error) throw error
+          return data as ShareLink
+        },
+      })
+    }
+    ```
+  </Step>
+  
+  <Step title="Copy and share">
+    Click the copy icon to copy the URL to your clipboard, then share it with others.
+  </Step>
+</Steps>
+
+## Share link URL format
+
+Share links follow this pattern:
+
+```
+https://your-domain.com/shared/[token]
+```
+
+For example:
+```
+https://goalst.app/shared/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6
+```
+
+## Permission levels
+
+<CardGroup cols={2}>
+  <Card title="View only" icon="eye">
+    **Can**:
+    - View goal details and description
+    - See all sub-goals and progress
+    - Read comments
+    - Add comments as a guest
+    
+    **Cannot**:
+    - Edit goal properties
+    - Mark sub-goals complete
+    - Create or delete sub-goals
+    - See or manage collaborators
+  </Card>
+  
+  <Card title="Can edit" icon="pencil">
+    **Can**:
+    - Everything viewers can do
+    - Edit goal title and description
+    - Update status and manual progress
+    - Create, edit, and complete sub-goals
+    - Change priorities
+    
+    **Cannot**:
+    - Delete the goal
+    - Manage collaborators
+    - Create or revoke share links
+    - Change the goal owner
+  </Card>
+</CardGroup>
+
+## Managing share links
+
+The share links panel shows all active links for a goal:
+
+```tsx
+export function SharePanel({ goalId }: SharePanelProps) {
+  const { data: links = [] } = useShareLinks(goalId)
+  
+  return (
+    <div>
+      {links.map((link) => (
+        <div key={link.id}>
+          <span className="truncate font-mono">
+            {getShareUrl(link.token)}
+          </span>
+          <Badge variant={link.permission === 'edit' ? 'yellow' : 'gray'}>
+            {link.permission}
+          </Badge>
+          <button onClick={() => handleCopy(link.token)}>
+            <Copy size={13} />
+          </button>
+          <button onClick={() => revokeLink.mutate({ id: link.id, goalId })}>
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+Each link shows:
+
+- **Full URL** - The complete shareable link (truncated with ellipsis)
+- **Permission badge** - Yellow for "edit", gray for "view"
+- **Copy button** - Quick copy to clipboard (shows "Copied!" feedback)
+- **Revoke button** - X icon to disable the link
+
+## Revoking share links
+
+You can revoke a share link at any time:
+
+```typescript
+export function useRevokeShareLink() {
+  return useMutation({
+    mutationFn: async ({ id, goalId }: { id: string; goalId: string }) => {
+      const { error } = await supabase
+        .from('goalst_share_links')
+        .update({ revoked_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+      return goalId
+    },
+  })
+}
+```
+
+1. Find the link in your share links list
+2. Click the X icon
+3. The link is immediately revoked
+
+<Warning>
+  Once revoked, the link stops working. Anyone who tries to access it will see an error. You cannot un-revoke a link - create a new one instead.
+</Warning>
+
+## Guest commenting
+
+Visitors who access a goal via share link can add comments, even without an account:
+
+```typescript
+export function useAddComment() {
+  return useMutation({
+    mutationFn: async ({
+      goalId,
+      body,
+      guestLabel,
+    }: {
+      goalId: string
+      body: string
+      guestLabel?: string
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data, error } = await supabase
+        .from('goalst_comments')
+        .insert({
+          goal_id: goalId,
+          body,
+          user_id: user?.id ?? null,
+          guest_label: user ? null : (guestLabel ?? 'Guest'),
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data as Comment
+    },
+  })
+}
+```
+
+- If not logged in, comments show as "Guest" or with a custom label
+- Guest comments don't have an associated user ID
+- All comments are visible to everyone with access to the goal
+
+<Note>
+  Consider asking guests to include their name in the comment body since the system labels them all as "Guest".
+</Note>
+
+## Shared goal view
+
+When someone accesses a share link, they see a dedicated view:
+
+```typescript
+export function useGoalByToken(token: string) {
+  return useQuery({
+    queryKey: ['shared-goal', token],
+    queryFn: async () => {
+      const { data: link, error: linkError } = await supabase
+        .from('goalst_share_links')
+        .select('*, goal:goal_id(*)')
+        .eq('token', token)
+        .is('revoked_at', null)
+        .single()
+      if (linkError) throw linkError
+      return link as ShareLink & { goal: Goal }
+    },
+    enabled: !!token,
+  })
+}
+```
+
+The shared view includes:
+
+- Goal title, description, and dates
+- Current status and progress
+- Full sub-goal tree (expanded by default)
+- Comments panel
+- Edit controls (if permission is "edit")
+
+What's NOT included:
+
+- User dashboard
+- Other goals
+- Score and achievement info
+- Collaborator management
+- Share link management
+
+## Multiple links per goal
+
+You can create multiple share links for the same goal:
+
+- Create separate view and edit links
+- Share different links with different audiences
+- Revoke individual links without affecting others
+
+```typescript
+// Query filters out revoked links
+const { data, error } = await supabase
+  .from('goalst_share_links')
+  .select('*')
+  .eq('goal_id', goalId)
+  .is('revoked_at', null)  // Only active links
+```
+
+<Note>
+  There's no limit to the number of share links you can create. However, consider using collaborators instead for team members who need ongoing access.
+</Note>
+
+## Security considerations
+
+<Warning>
+  Share links are bearer tokens. Anyone with the URL has access. Treat them like passwords.
+</Warning>
+
+### Best practices
+
+<CardGroup cols={2}>
+  <Card title="Use view-only by default" icon="lock">
+    Only create edit links when necessary. View-only is safer for most use cases.
+  </Card>
+  
+  <Card title="Revoke when done" icon="ban">
+    Revoke share links after they've served their purpose. Don't leave old links active.
+  </Card>
+  
+  <Card title="Avoid public posting" icon="exclamation-triangle">
+    Don't post share links on public forums, social media, or public repos.
+  </Card>
+  
+  <Card title="Use collaborators for teams" icon="users">
+    For team members, add them as collaborators instead of sharing links.
+  </Card>
+</CardGroup>
+
+### What share links cannot do
+
+- Cannot be password-protected
+- Cannot have expiration dates (revoke manually)
+- Cannot track who accessed them
+- Cannot limit access to specific domains or IPs
+
+## Collaboration vs. sharing comparison
+
+<CardGroup cols={2}>
+  <Card title="When to use collaborators">
+    - Team members who need ongoing access
+    - When you want to track who makes changes
+    - When users have Goalst accounts
+    - For goals that should appear in their dashboard
+  </Card>
+  
+  <Card title="When to use share links">
+    - External stakeholders or clients
+    - People without Goalst accounts
+    - Temporary or one-time sharing
+    - When you need quick, easy access
+  </Card>
+</CardGroup>
+
+## Related features
+
+<CardGroup cols={2}>
+  <Card title="Collaboration" icon="users" href="/features/collaboration">
+    Invite team members with role-based permissions
+  </Card>
+  
+  <Card title="Goals" icon="target" href="/features/goals">
+    Learn about creating and managing goals
+  </Card>
+</CardGroup>

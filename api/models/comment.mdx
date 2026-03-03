@@ -1,0 +1,96 @@
+---
+title: Comment
+description: The Comment data model represents a comment on a goal
+---
+
+The `Comment` interface represents a comment made on a goal. Comments can be made by authenticated users or by guests accessing via share links.
+
+## Properties
+
+<ResponseField name="id" type="string" required>
+  Unique identifier for the comment
+</ResponseField>
+
+<ResponseField name="goal_id" type="string" required>
+  ID of the goal this comment belongs to
+</ResponseField>
+
+<ResponseField name="user_id" type="string | null" required>
+  ID of the user who created the comment, or `null` if created by a guest
+</ResponseField>
+
+<ResponseField name="guest_label" type="string | null" required>
+  Display name for guest commenters (when `user_id` is `null`), or `null` for authenticated users
+</ResponseField>
+
+<ResponseField name="body" type="string" required>
+  The content of the comment
+</ResponseField>
+
+<ResponseField name="created_at" type="string" required>
+  ISO 8601 timestamp when the comment was created
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  User details for authenticated commenters (computed/joined field)
+  
+  <Expandable title="properties">
+    <ResponseField name="id" type="string" required>
+      User's unique identifier
+    </ResponseField>
+    
+    <ResponseField name="email" type="string" required>
+      User's email address
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example
+
+### Authenticated user comment
+
+```json
+{
+  "id": "comment_123",
+  "goal_id": "goal_456",
+  "user_id": "user_789",
+  "guest_label": null,
+  "body": "Great progress on this milestone!",
+  "created_at": "2026-03-03T14:22:00Z",
+  "user": {
+    "id": "user_789",
+    "email": "user@example.com"
+  }
+}
+```
+
+### Guest comment
+
+```json
+{
+  "id": "comment_124",
+  "goal_id": "goal_456",
+  "user_id": null,
+  "guest_label": "Anonymous Reviewer",
+  "body": "This looks promising!",
+  "created_at": "2026-03-03T15:10:00Z",
+  "user": null
+}
+```
+
+## Type definitions
+
+```typescript
+export interface Comment {
+  id: string
+  goal_id: string
+  user_id: string | null
+  guest_label: string | null
+  body: string
+  created_at: string
+  user?: {
+    id: string
+    email: string
+  }
+}
+```

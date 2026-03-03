@@ -1,0 +1,197 @@
+---
+title: Templates hooks
+description: React hooks for managing goal templates
+---
+
+React hooks for saving, fetching, and deleting goal templates that can be reused to create new goals.
+
+## useTemplates
+
+Fetch all goal templates for the current user.
+
+```typescript
+const { data, isLoading, error } = useTemplates()
+```
+
+### Returns
+
+<ParamField path="data" type="GoalTemplate[]">
+  Array of goal templates, ordered by creation date (newest first)
+</ParamField>
+
+<ParamField path="isLoading" type="boolean">
+  Loading state of the query
+</ParamField>
+
+<ParamField path="error" type="Error | null">
+  Error object if the query failed
+</ParamField>
+
+### Example
+
+```typescript
+import { useTemplates } from '@features/goals/api/use-templates'
+
+function TemplatesList() {
+  const { data: templates, isLoading } = useTemplates()
+  
+  if (isLoading) return <div>Loading templates...</div>
+  
+  return (
+    <ul>
+      {templates?.map((template) => (
+        <li key={template.id}>
+          {template.name}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+## useSaveTemplate
+
+Save a goal as a reusable template.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useSaveTemplate()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(params: SaveTemplateParams) => void">
+  Function to save a template
+</ParamField>
+
+<ParamField path="mutateAsync" type="(params: SaveTemplateParams) => Promise<GoalTemplate>">
+  Async function to save a template and await the result
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="name" type="string" required>
+  The name of the template
+</ParamField>
+
+<ParamField path="goal" type="Partial<Goal>" required>
+  The goal structure to save as a template. Typically includes fields like `title`, `description`, `end_date`, and any sub-goals.
+</ParamField>
+
+### Example
+
+```typescript
+import { useSaveTemplate } from '@features/goals/api/use-templates'
+import { useGoal } from '@features/goals/api/use-goals'
+
+function SaveAsTemplateButton({ goalId }: { goalId: string }) {
+  const { data: goal } = useGoal(goalId)
+  const { mutate: saveTemplate, isPending } = useSaveTemplate()
+  
+  const handleSave = () => {
+    const name = prompt('Enter template name:')
+    if (!name || !goal) return
+    
+    saveTemplate({
+      name,
+      goal: {
+        title: goal.title,
+        description: goal.description,
+        end_date: goal.end_date,
+        // Include any other fields you want in the template
+      },
+    })
+  }
+  
+  return (
+    <button onClick={handleSave} disabled={isPending}>
+      Save as Template
+    </button>
+  )
+}
+```
+
+## useDeleteTemplate
+
+Delete a goal template.
+
+```typescript
+const { mutate, mutateAsync, isPending } = useDeleteTemplate()
+```
+
+### Returns
+
+<ParamField path="mutate" type="(templateId: string) => void">
+  Function to delete a template
+</ParamField>
+
+<ParamField path="mutateAsync" type="(templateId: string) => Promise<void>">
+  Async function to delete a template and await completion
+</ParamField>
+
+<ParamField path="isPending" type="boolean">
+  Loading state of the mutation
+</ParamField>
+
+### Parameters
+
+<ParamField path="templateId" type="string" required>
+  The ID of the template to delete
+</ParamField>
+
+### Example
+
+```typescript
+import { useDeleteTemplate } from '@features/goals/api/use-templates'
+
+function DeleteTemplateButton({ templateId }: { templateId: string }) {
+  const { mutate: deleteTemplate, isPending } = useDeleteTemplate()
+  
+  const handleDelete = () => {
+    if (confirm('Delete this template?')) {
+      deleteTemplate(templateId)
+    }
+  }
+  
+  return (
+    <button onClick={handleDelete} disabled={isPending}>
+      Delete Template
+    </button>
+  )
+}
+```
+
+### Using templates to create goals
+
+Templates can be used to quickly create new goals with predefined structures:
+
+```typescript
+import { useTemplates } from '@features/goals/api/use-templates'
+import { useCreateGoal } from '@features/goals/api/use-goals'
+
+function CreateFromTemplate() {
+  const { data: templates } = useTemplates()
+  const { mutate: createGoal } = useCreateGoal()
+  
+  const handleUseTemplate = (template: GoalTemplate) => {
+    createGoal(template.structure)
+  }
+  
+  return (
+    <div>
+      <h2>Create from template</h2>
+      {templates?.map((template) => (
+        <button
+          key={template.id}
+          onClick={() => handleUseTemplate(template)}
+        >
+          {template.name}
+        </button>
+      ))}
+    </div>
+  )
+}
+```

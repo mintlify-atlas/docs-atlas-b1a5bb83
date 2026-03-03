@@ -1,0 +1,390 @@
+---
+title: Scoring system and achievement ranks
+description: Earn points by completing goals and climb through achievement ranks
+---
+
+Goalst gamifies goal completion with a scoring system and achievement ranks. Every completed goal earns you points based on its priority, and your total score determines your rank.
+
+## How scoring works
+
+Your score is calculated from all completed goals:
+
+```typescript
+interface UserScore {
+  user_id: string
+  total_score: number      // Sum of completed goal priorities
+  goals_completed: number  // Count of completed goals
+  goals_total: number      // Count of all goals (any status)
+}
+```
+
+### Earning points
+
+When you mark a goal as "completed", you earn points equal to the goal's **priority** value:
+
+- Complete a goal with priority 1 → **+1 point**
+- Complete a goal with priority 5 → **+5 points**
+- Complete a goal with priority 20 → **+20 points**
+
+```typescript
+const updateGoal = useUpdateGoal()
+
+await updateGoal.mutateAsync({
+  id: goalId,
+  status: 'completed',
+  manual_progress: 100
+})
+// Your score increases by goal.priority
+// goals_completed counter increments
+```
+
+<Note>
+  Only the goal **owner** earns points. If a collaborator marks your goal complete, you get the points, not them.
+</Note>
+
+## Priority levels
+
+Priority is set when creating or editing a goal:
+
+- **Range**: 1-20
+- **Default**: 1
+- **Higher priority** = more points when completed
+
+```typescript
+interface Goal {
+  priority: number  // 1-20
+}
+```
+
+Use priority to:
+
+- **Reflect difficulty** - Harder goals get higher priority
+- **Indicate importance** - Critical goals earn more points
+- **Balance workload** - Distribute points across your goal tree
+
+<Warning>
+  Changing a goal's priority does NOT retroactively change your score. Only newly completed goals use the updated priority.
+</Warning>
+
+## Achievement ranks
+
+Your total score determines your achievement rank. Goalst has 6 ranks:
+
+<Steps>
+  <Step title="Rookie (0+ points)">
+    🌱 Starting rank for all new users  
+    Next rank at **50 points**
+  </Step>
+  
+  <Step title="Hustler (50+ points)">
+    ⚡ You're building momentum  
+    Next rank at **150 points**
+  </Step>
+  
+  <Step title="Achiever (150+ points)">
+    🎯 Consistently hitting goals  
+    Next rank at **350 points**
+  </Step>
+  
+  <Step title="Go-Getter (350+ points)">
+    🔥 High performer, crushing it  
+    Next rank at **700 points**
+  </Step>
+  
+  <Step title="Champion (700+ points)">
+    🏆 Elite goal completer  
+    Next rank at **1500 points**
+  </Step>
+  
+  <Step title="Legend (1500+ points)">
+    👑 Maximum rank, ultimate achiever  
+    **No next rank** - you've reached the top!
+  </Step>
+</Steps>
+
+## Rank data structure
+
+Ranks are defined in code:
+
+```typescript
+export const RANKS: Array<RankInfo & { min_score: number }> = [
+  { min_score: 0,    rank_name: 'Rookie',    rank_emoji: '🌱', next_threshold: 50,   next_rank_name: 'Hustler'   },
+  { min_score: 50,   rank_name: 'Hustler',   rank_emoji: '⚡', next_threshold: 150,  next_rank_name: 'Achiever'  },
+  { min_score: 150,  rank_name: 'Achiever',  rank_emoji: '🎯', next_threshold: 350,  next_rank_name: 'Go-Getter' },
+  { min_score: 350,  rank_name: 'Go-Getter', rank_emoji: '🔥', next_threshold: 700,  next_rank_name: 'Champion'  },
+  { min_score: 700,  rank_name: 'Champion',  rank_emoji: '🏆', next_threshold: 1500, next_rank_name: 'Legend'    },
+  { min_score: 1500, rank_name: 'Legend',    rank_emoji: '👑', next_threshold: null, next_rank_name: null        },
+]
+```
+
+### Rank calculation
+
+```typescript
+export function getRankInfo(score: number): RankInfo {
+  // Find highest rank where score >= min_score
+  const rank = [...RANKS].reverse().find((r) => score >= r.min_score) ?? RANKS[0]
+  
+  return {
+    rank_name: rank.rank_name,
+    rank_emoji: rank.rank_emoji,
+    next_threshold: rank.next_threshold,
+    next_rank_name: rank.next_rank_name,
+  }
+}
+```
+
+Example:
+
+```typescript
+getRankInfo(0)    // → { rank_name: 'Rookie', rank_emoji: '🌱', next_threshold: 50, next_rank_name: 'Hustler' }
+getRankInfo(75)   // → { rank_name: 'Hustler', rank_emoji: '⚡', next_threshold: 150, next_rank_name: 'Achiever' }
+getRankInfo(2000) // → { rank_name: 'Legend', rank_emoji: '👑', next_threshold: null, next_rank_name: null }
+```
+
+## Viewing your score and rank
+
+Your score and rank are displayed in the app header or stats panel:
+
+```typescript
+export function useUserScore() {
+  return useQuery({
+    queryKey: ['user-score'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return null
+
+      const { data, error } = await supabase
+        .from('goalst_user_scores')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (error) throw error
+
+      // If no completed goals yet, return zeroed score
+      if (!data) {
+        return {
+          user_id: user.id,
+          total_score: 0,
+          goals_completed: 0,
+          goals_total: 0,
+        } as UserScore
+      }
+
+      return data as UserScore
+    },
+  })
+}
+```
+
+The score panel typically shows:
+
+- **Rank name and emoji** (e.g., "⚡ Hustler")
+- **Current score** (e.g., "75 points")
+- **Progress to next rank** (e.g., "75 more points to Achiever")
+- **Goals completed** (e.g., "12 of 20 goals completed")
+
+<Note>
+  Your score updates immediately when you complete or uncomplete a goal. The rank updates in real-time based on your new score.
+</Note>
+
+## Score progression strategies
+
+<CardGroup cols={2}>
+  <Card title="Complete high-priority goals" icon="fire">
+    Focus on finishing your highest-priority goals first to maximize points per goal.
+  </Card>
+  
+  <Card title="Break down big goals" icon="scissors">
+    Split large goals into sub-goals so you can earn incremental progress and points.
+  </Card>
+  
+  <Card title="Set realistic priorities" icon="balance-scale">
+    Don't inflate priorities artificially. Use them to reflect true importance.
+  </Card>
+  
+  <Card title="Complete vs. abandon" icon="check-circle">
+    Marking a goal "abandoned" gives 0 points. Only "completed" goals count.
+  </Card>
+</CardGroup>
+
+## Sub-goals and scoring
+
+Each goal in a hierarchy earns points independently:
+
+```typescript
+const goal = {
+  title: "Launch Product",
+  priority: 10,
+  status: 'completed',  // +10 points
+  sub_goals: [
+    { title: "Build MVP", priority: 5, status: 'completed' },     // +5 points
+    { title: "Marketing", priority: 3, status: 'completed' },     // +3 points
+    { title: "Launch Plan", priority: 2, status: 'in_progress' }  // 0 points
+  ]
+}
+
+// Total earned: 10 + 5 + 3 = 18 points
+```
+
+- **Completing a parent** does NOT auto-complete children
+- **Each completed goal** adds its own priority to your score
+- **Sub-goal points stack** - complete the whole tree to maximize points
+
+<Note>
+  A goal with priority 10 and three priority-5 sub-goals can earn up to **10 + 5 + 5 + 5 = 25 points** if you complete all four.
+</Note>
+
+## Effective priority
+
+The "effective priority" shows the total potential score from a goal and all its descendants:
+
+```typescript
+export function getEffectivePriority(goal: Goal): number {
+  const childrenSum =
+    goal.sub_goals?.reduce((sum, child) => sum + getEffectivePriority(child), 0) ?? 0
+  return goal.priority + childrenSum
+}
+```
+
+Use effective priority to:
+
+- **Prioritize work** - See which goal trees offer the most points
+- **Plan progression** - Identify high-value goals to focus on
+- **Balance effort** - Choose goals that align difficulty with reward
+
+## Uncompleting goals
+
+If you change a goal's status from "completed" to something else:
+
+```typescript
+await updateGoal.mutateAsync({
+  id: goalId,
+  status: 'in_progress'  // or 'not_started', 'abandoned'
+})
+```
+
+- Your score **decreases** by the goal's priority
+- `goals_completed` counter decrements
+- Your rank may drop if you fall below a threshold
+
+<Warning>
+  Be careful uncompleting goals - it directly reduces your score and can lower your rank.
+</Warning>
+
+## Score persistence
+
+Scores are stored in the database:
+
+```sql
+CREATE TABLE goalst_user_scores (
+  user_id UUID PRIMARY KEY,
+  total_score INTEGER,
+  goals_completed INTEGER,
+  goals_total INTEGER
+);
+```
+
+The score is updated via database triggers or application logic whenever a goal's status changes to or from "completed".
+
+## Rank milestones
+
+Here's how many goals you need to reach each rank (assuming average priority):
+
+<CardGroup cols={3}>
+  <Card title="Rookie → Hustler">
+    **50 points**  
+    ~10 priority-5 goals  
+    or 5 priority-10 goals
+  </Card>
+  
+  <Card title="Hustler → Achiever">
+    **150 points total**  
+    ~30 priority-5 goals  
+    or 15 priority-10 goals
+  </Card>
+  
+  <Card title="Achiever → Go-Getter">
+    **350 points total**  
+    ~70 priority-5 goals  
+    or 35 priority-10 goals
+  </Card>
+  
+  <Card title="Go-Getter → Champion">
+    **700 points total**  
+    ~140 priority-5 goals  
+    or 70 priority-10 goals
+  </Card>
+  
+  <Card title="Champion → Legend">
+    **1500 points total**  
+    ~300 priority-5 goals  
+    or 150 priority-10 goals
+  </Card>
+  
+  <Card title="Legend">
+    **1500+ points**  
+    No limit - keep climbing!  
+    Highest rank in Goalst
+  </Card>
+</CardGroup>
+
+## Best practices
+
+<CardGroup cols={2}>
+  <Card title="Use priority meaningfully" icon="star">
+    Don't game the system by inflating priorities. Use them to reflect true goal importance.
+  </Card>
+  
+  <Card title="Celebrate milestones" icon="party-horn">
+    Reaching a new rank is an achievement. Take a moment to appreciate your progress.
+  </Card>
+  
+  <Card title="Focus on completion" icon="check-double">
+    Points only come from completed goals. Better to finish 10 goals than start 100.
+  </Card>
+  
+  <Card title="Track your rate" icon="chart-line">
+    Monitor your goals_completed / goals_total ratio to see your completion rate over time.
+  </Card>
+</CardGroup>
+
+## Leaderboards (future)
+
+Goalst currently doesn't have leaderboards, but they could be added:
+
+```typescript
+// Potential future feature
+const { data: topUsers } = await supabase
+  .from('goalst_user_scores')
+  .select('user_id, total_score, goals_completed')
+  .order('total_score', { ascending: false })
+  .limit(10)
+```
+
+Leaderboards would show:
+
+- Top users by total score
+- Most goals completed
+- Highest completion rate
+- Weekly/monthly top achievers
+
+<Note>
+  Interested in leaderboards or other gamification features? Share your feedback with the Goalst team.
+</Note>
+
+## Related features
+
+<CardGroup cols={2}>
+  <Card title="Goals" icon="target" href="/features/goals">
+    Learn about creating goals and setting priorities
+  </Card>
+  
+  <Card title="Nested goals" icon="sitemap" href="/features/nested-goals">
+    Understand how sub-goals contribute to scoring
+  </Card>
+  
+  <Card title="Progress tracking" icon="chart-line" href="/features/progress-tracking">
+    See how completion affects progress and scoring
+  </Card>
+</CardGroup>

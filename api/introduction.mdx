@@ -1,0 +1,236 @@
+---
+title: Introduction
+description: Overview of Goalst's API architecture and development patterns
+---
+
+## Architecture overview
+
+Goalst is built on a modern React architecture leveraging Supabase as the backend-as-a-service platform. The application uses a feature-based folder structure with centralized state management through React Query.
+
+### Core stack
+
+- **Frontend**: React 18 with TypeScript
+- **Backend**: Supabase (PostgreSQL + Auth + Realtime)
+- **State management**: TanStack React Query v5
+- **Routing**: React Router v6
+- **Build tool**: Vite
+
+## Application providers
+
+The app wraps all features in a provider hierarchy that sets up global services:
+
+```tsx src/app.provider.tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { AuthProvider } from '@features/auth/providers/auth-provider'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+})
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
+  )
+}
+```
+
+<Note>
+  The React Query client is configured with a 5-minute stale time to reduce unnecessary refetches and improve performance.
+</Note>
+
+## React Query patterns
+
+Goalst uses React Query extensively for server state management. All API interactions follow consistent patterns:
+
+### Query hooks
+
+Queries fetch and cache data from Supabase:
+
+```tsx src/features/goals/api/use-goals.ts
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@shared/services/supabase-client'
+import type { Goal } from '@shared/types'
+
+export const GOALS_QUERY_KEY = ['goals']
+
+export function useGoals() {
+  return useQuery({
+    queryKey: GOALS_QUERY_KEY,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('goalst_goals')
+        .select('*')
+        .is('parent_goal_id', null)
+        .order('end_date', { ascending: true, nullsFirst: false })
+
+      if (error) throw error
+      return data as Goal[]
+    },
+  })
+}
+```
+
+### Mutation hooks
+
+Mutations modify data and automatically invalidate related queries:
+
+```tsx src/features/goals/api/use-goals.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+export function useCreateGoal() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<Goal>) => {
+      const { data, error } = await supabase
+        .from('goalst_goals')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as Goal
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: GOALS_QUERY_KEY })
+    },
+  })
+}
+```
+
+<Note>
+  Mutations use `invalidateQueries` to automatically refetch affected data after successful operations.
+</Note>
+
+### Conditional queries
+
+Queries can be disabled until their dependencies are ready:
+
+```tsx src/features/goals/api/use-goals.ts
+export function useSubGoals(parentId: string) {
+  return useQuery({
+    queryKey: ['sub-goals', parentId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('goalst_goals')
+        .select('*')
+        .eq('parent_goal_id', parentId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+      return data as Goal[]
+    },
+    enabled: !!parentId,
+  })
+}
+```
+
+## Supabase integration
+
+The Supabase client is initialized once and imported throughout the app:
+
+```tsx src/shared/services/supabase-client.ts
+import { createClient } from '@supabase/supabase-js'
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@shared/constants/supabase'
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+```
+
+```tsx src/shared/constants/supabase.ts
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string
+export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+```
+
+<Warning>
+  Never commit your `.env` file. Store Supabase credentials in environment variables.
+</Warning>
+
+## Type safety
+
+All API responses are typed using TypeScript interfaces:
+
+```tsx src/shared/types/goal.ts
+export type GoalStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'completed'
+  | 'abandoned'
+  | string // custom user-defined statuses
+
+export interface Goal {
+  id: string
+  user_id: string
+  parent_goal_id: string | null
+  title: string
+  description: string | null
+  start_date: string | null
+  end_date: string | null
+  status: GoalStatus
+  manual_progress: number | null
+  color_tag: string | null
+  is_recurring: boolean
+  recurrence_cadence: 'daily' | 'weekly' | null
+  priority: number
+  created_at: string
+  updated_at: string
+}
+```
+
+## Feature organization
+
+Each feature follows a consistent structure:
+
+```
+features/
+  goals/
+    api/           # React Query hooks
+    components/    # Reusable components
+    screen/        # Page-level components
+  auth/
+    api/
+    providers/
+    guards/
+    screen/
+```
+
+## Query invalidation strategy
+
+The app uses strategic query invalidation to keep the UI in sync:
+
+<CodeGroup>
+
+```tsx Single query
+qc.invalidateQueries({ queryKey: ['goal', goalId] })
+```
+
+```tsx Multiple related queries
+qc.invalidateQueries({ queryKey: GOALS_QUERY_KEY })
+if (variables.parent_goal_id) {
+  qc.invalidateQueries({ queryKey: ['sub-goals', variables.parent_goal_id] })
+}
+if (variables.status) {
+  qc.invalidateQueries({ queryKey: ['user-score'] })
+}
+```
+
+</CodeGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/api/authentication">
+    Learn how authentication works with Supabase
+  </Card>
+  <Card title="Data Models" icon="database" href="/api/models/goal">
+    Explore the data models and types
+  </Card>
+</CardGroup>
